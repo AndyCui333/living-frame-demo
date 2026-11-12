@@ -9,6 +9,7 @@ import {
   DataBoard,
   Document,
   FolderOpened,
+  Headset,
   Key,
   MagicStick,
   Menu as MenuIcon,
@@ -44,6 +45,9 @@ const iconMap: Record<string, Component> = {
   'ai:chat': ChatDotRound,
   'ai:agent': Cpu,
   'ai:config': Setting,
+  'customer-service': Headset,
+  'cs:chat:list': ChatDotRound,
+  'cs:ticket:list': Tickets,
   dashboard: DataBoard,
 }
 

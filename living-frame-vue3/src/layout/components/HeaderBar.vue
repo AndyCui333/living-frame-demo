@@ -55,6 +55,8 @@ const roleNames: Record<string, string> = {
   BUSINESS_ADMIN: '业务管理员',
   VIEWER: '只读用户',
   BIZ_USER: '业务用户',
+  CS_CHAT: '客服聊天',
+  CS_TECH: '客服技术',
 }
 
 const roleTags = computed(() =>

@@ -25,7 +25,6 @@ app:
     key-secret: ${AI_CONFIG_SECRET}
     memory:
       qdrant-url: ${QDRANT_URL}
-      collection: ${QDRANT_COLLECTION:living-frame-ai-memory}
   redisson:
     address: redis://${REDIS_HOST}:${REDIS_PORT}
     password: ${REDIS_PASSWORD}
@@ -37,3 +36,4 @@ app:
     blacklist-password: ${INIT_BLACKLIST_PASSWORD}
     smoke-password: ${INIT_SMOKE_PASSWORD}
     business-password: ${INIT_BUSINESS_PASSWORD}
+    cs-password: ${INIT_CS_PASSWORD}

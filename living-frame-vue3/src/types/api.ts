@@ -274,6 +274,47 @@ export interface AiConversationDetail {
   messages: AiConversationMessage[]
 }
 
+export interface CsAgent {
+  id: string
+  userId: string
+  name: string
+  serviceType: 'CHAT' | 'TECH'
+  onlineStatus: 'IDLE' | 'BUSY' | 'OFFLINE'
+  currentTicketId?: string | null
+}
+
+export interface CsTicket {
+  id: string
+  ticketNo: string
+  title: string
+  content: string
+  ticketType: 'CHAT' | 'TECH'
+  status: 'DRAFT' | 'PENDING' | 'ASSIGNED' | 'PROCESSING' | 'ARCHIVED'
+  portalUserName: string
+  assignedAgentId?: string | null
+  assignedAgentName?: string
+  rating?: number | null
+  feedback?: string | null
+  assignedAt?: string | null
+  lastMessageAt?: string | null
+  closedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CsMessage {
+  id: string
+  senderType: 'PORTAL' | 'AGENT' | 'SYSTEM'
+  senderName: string
+  content: string
+  createdAt: string
+}
+
+export interface CsTicketDetail {
+  ticket: CsTicket
+  messages: CsMessage[]
+}
+
 export interface AgentResult {
   reply: string
 }

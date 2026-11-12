@@ -3,6 +3,7 @@ package com.livingframe.admin.init;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.livingframe.business.entity.BizUser;
 import com.livingframe.business.mapper.BizUserMapper;
+import com.livingframe.business.service.CsAgentService;
 import com.livingframe.common.constant.Constants;
 import com.livingframe.system.entity.SysRole;
 import com.livingframe.system.entity.SysUser;
@@ -33,6 +34,7 @@ public class AccountInitializer implements ApplicationRunner {
     private final SysRoleMapper roleMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final BizUserMapper bizUserMapper;
+    private final CsAgentService csAgentService;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.init.admin-password:Admin@123}")
@@ -53,6 +55,9 @@ public class AccountInitializer implements ApplicationRunner {
     @Value("${app.init.smoke-password:Smoke@123}")
     private String smokePassword;
 
+    @Value("${app.init.cs-password:Cs@123}")
+    private String csPassword;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void run(ApplicationArguments args) {
@@ -61,7 +66,12 @@ public class AccountInitializer implements ApplicationRunner {
         createAdmin("viewer", viewerPassword, "只读用户", Constants.ROLE_VIEWER);
         createAdmin("blacklist_test", blacklistPassword, "黑名单测试账号", Constants.ROLE_VIEWER);
         createAdmin("smoke_test", smokePassword, "冒烟测试账号", "SMOKE_TEST");
+        createAdmin("cs_chat01", csPassword, "在线客服一号", Constants.ROLE_CS_CHAT);
+        createAdmin("cs_chat02", csPassword, "在线客服二号", Constants.ROLE_CS_CHAT);
+        createAdmin("cs_tech01", csPassword, "技术客服一号", Constants.ROLE_CS_TECH);
+        createAdmin("cs_tech02", csPassword, "技术客服二号", Constants.ROLE_CS_TECH);
         createBusinessUser("biz01", businessPassword, "业务演示用户");
+        csAgentService.ensureProfiles();
     }
 
     private void createAdmin(String username, String rawPassword, String nickname, String roleCode) {

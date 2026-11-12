@@ -101,6 +101,22 @@ const router = createRouter({
           component: () => import('@/views/ai/AiSettingsView.vue'),
           meta: { title: 'AI 设置', permission: 'ai:chat' },
         },
+        {
+          path: 'customer-service',
+          redirect: '/customer-service/chat',
+        },
+        {
+          path: 'customer-service/chat',
+          name: 'CsChat',
+          component: () => import('@/views/customerService/CsChatView.vue'),
+          meta: { title: '客服聊天', permission: 'cs:chat:list' },
+        },
+        {
+          path: 'customer-service/ticket',
+          name: 'CsTicket',
+          component: () => import('@/views/customerService/CsTicketView.vue'),
+          meta: { title: '工单流程', permission: 'cs:ticket:list' },
+        },
       ],
     },
     {

@@ -163,6 +163,65 @@ CREATE TABLE IF NOT EXISTS `ai_message`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='AI 对话消息（长期记忆源）';
 
+CREATE TABLE IF NOT EXISTS `cs_agent_profile`
+(
+    `id`                BIGINT      NOT NULL COMMENT '主键',
+    `user_id`           BIGINT      NOT NULL COMMENT '客服后台用户 ID',
+    `service_type`      VARCHAR(16) NOT NULL COMMENT 'CHAT/TECH',
+    `online_status`     VARCHAR(16) NOT NULL DEFAULT 'IDLE' COMMENT 'IDLE/BUSY/OFFLINE',
+    `current_ticket_id` BIGINT      DEFAULT NULL COMMENT '当前处理工单',
+    `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted`           TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cs_agent_user` (`user_id`),
+    KEY `idx_cs_agent_dispatch` (`service_type`, `online_status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='客服坐席状态';
+
+CREATE TABLE IF NOT EXISTS `cs_ticket`
+(
+    `id`                BIGINT       NOT NULL COMMENT '主键',
+    `ticket_no`         VARCHAR(32)  NOT NULL COMMENT '工单编号',
+    `portal_user_id`    BIGINT       NOT NULL COMMENT '门户/业务用户 ID',
+    `title`             VARCHAR(200) NOT NULL COMMENT '标题',
+    `content`           TEXT         NOT NULL COMMENT '问题描述',
+    `ticket_type`       VARCHAR(16)  NOT NULL COMMENT 'CHAT/TECH',
+    `status`            VARCHAR(20)  NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/PENDING/ASSIGNED/PROCESSING/ARCHIVED',
+    `assigned_agent_id` BIGINT       DEFAULT NULL COMMENT '接单客服用户 ID',
+    `assigned_at`       DATETIME     DEFAULT NULL,
+    `last_message_at`   DATETIME     DEFAULT NULL,
+    `closed_at`         DATETIME     DEFAULT NULL,
+    `rating`            TINYINT      DEFAULT NULL COMMENT '1-5',
+    `feedback`          VARCHAR(1000) DEFAULT NULL,
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted`           TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cs_ticket_no` (`ticket_no`),
+    KEY `idx_cs_ticket_portal` (`portal_user_id`, `status`),
+    KEY `idx_cs_ticket_agent` (`assigned_agent_id`, `status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='客服工单';
+
+CREATE TABLE IF NOT EXISTS `cs_ticket_message`
+(
+    `id`          BIGINT      NOT NULL COMMENT '主键',
+    `ticket_id`   BIGINT      NOT NULL COMMENT '工单 ID',
+    `sender_type` VARCHAR(16) NOT NULL COMMENT 'PORTAL/AGENT/SYSTEM',
+    `sender_id`   BIGINT      DEFAULT NULL,
+    `content`     TEXT        NOT NULL,
+    `created_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted`     TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_cs_ticket_message` (`ticket_id`, `id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='客服工单消息';
+
 CREATE TABLE IF NOT EXISTS `sys_login_log`
 (
     `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',

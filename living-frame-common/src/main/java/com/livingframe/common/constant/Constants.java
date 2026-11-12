@@ -28,6 +28,8 @@ public final class Constants {
     public static final String ROLE_BUSINESS_ADMIN = "BUSINESS_ADMIN";
     public static final String ROLE_VIEWER = "VIEWER";
     public static final String ROLE_BUSINESS_USER = "BIZ_USER";
+    public static final String ROLE_CS_CHAT = "CS_CHAT";
+    public static final String ROLE_CS_TECH = "CS_TECH";
 
     public static final int STATUS_ENABLED = 1;
     public static final int STATUS_DISABLED = 0;
