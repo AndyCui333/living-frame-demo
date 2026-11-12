@@ -83,7 +83,8 @@ living-frame-demo
 ├── living-frame-business    业务用户模块
 ├── living-frame-ai          AI 对话、Agent、配置、会话记忆
 ├── living-frame-admin       启动模块与配置文件
-└── living-frame-vue3        Vue 3 前端
+├── living-frame-vue3        管理后台 Vue 3 前端
+└── living-frame-portal      门户用户移动端 Vue 3 前端
 ```
 
 ## 快速开始（Maven 版本）
@@ -137,13 +138,25 @@ java -jar living-frame-admin/target/living-frame-admin.jar --spring.profiles.act
 
 ### 3. 启动前端
 
+管理后台：
+
 ```bash
 cd living-frame-vue3
 npm install
 npm run dev
 ```
 
-前端默认端口：`5173`。
+管理后台默认端口：`5173`。
+
+门户移动端：
+
+```bash
+cd living-frame-portal
+npm install
+npm run dev
+```
+
+门户默认端口：`5175`。门户是独立的移动端 App 风格项目，底部只有首页和我的，客服入口为可拖拽圆形浮窗。
 
 ### 4. 演示账号
 

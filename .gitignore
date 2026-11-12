@@ -14,3 +14,5 @@ logs/
 living-frame-vue3/node_modules/
 living-frame-vue3/dist/
 living-frame-admin/src/main/resources/application-dev.yml
+living-frame-portal/node_modules/
+living-frame-portal/dist/
