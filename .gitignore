@@ -1,0 +1,16 @@
+target/
+.idea/
+*.iml
+*.ipr
+*.iws
+.mvn/
+logs/
+*.log
+.env
+.DS_Store
+.npm-cache/
+.m2repo/
+.tmp/
+living-frame-vue3/node_modules/
+living-frame-vue3/dist/
+living-frame-admin/src/main/resources/application-dev.yml

@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+.npm-cache/
+
+# build
+dist/
+dist-ssr/
+*.local
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*

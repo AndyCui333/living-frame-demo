@@ -1,0 +1,79 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: living-frame
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  main:
+    headless: true
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 10000
+      pool-name: living-frame-pool
+  data:
+    redis:
+      timeout: 3s
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 604800
+  active-timeout: 1800
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-read-cookie: false
+  is-read-header: true
+  is-write-header: false
+  is-log: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+app:
+  security:
+    captcha-enabled: true
+  ai:
+    memory:
+      enabled: true
+      collection: ${QDRANT_COLLECTION:living-frame-ai-memory}
+      vector-size: 384
+      top-k: 5
+      score-threshold: 0.18
+      history-limit: 10
+      redis-ttl-hours: 6
+
+logging:
+  level:
+    root: info
+    com.livingframe: info

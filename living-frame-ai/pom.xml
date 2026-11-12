@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.livingframe</groupId>
+        <artifactId>living-frame-demo</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>living-frame-ai</artifactId>
+    <name>living-frame-ai</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.livingframe</groupId>
+            <artifactId>living-frame-framework</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.livingframe</groupId>
+            <artifactId>living-frame-system</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.livingframe</groupId>
+            <artifactId>living-frame-business</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
+        </dependency>
+    </dependencies>
+</project>
