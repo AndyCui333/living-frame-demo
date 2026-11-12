@@ -55,6 +55,7 @@
 - Vue 3 + TypeScript + Element Plus
 - 响应式后台布局、可收起侧边栏
 - 仪表盘、系统管理、业务管理、AI 能力等模块
+- 独立移动端门户：手机 App / 小程序风格，底部只有首页和我的，可拖拽圆形客服入口
 - 统一卡片、表格、工具栏、空状态和表单样式
 
 ## 技术栈
@@ -79,7 +80,8 @@ living-frame-demo
 ├── living-frame-business    业务用户模块
 ├── living-frame-ai          AI 对话、Agent、配置、会话记忆
 ├── living-frame-admin       启动模块与配置
-└── living-frame-vue3        Vue 3 前端
+├── living-frame-vue3        管理后台 Vue 3 前端
+└── living-frame-portal      移动端门户 Vue 3 前端
 ```
 
 ## 分支说明
