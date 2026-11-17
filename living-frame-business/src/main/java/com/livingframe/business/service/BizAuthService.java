@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.stp.parameter.SaLoginParameter;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.livingframe.business.dto.BizLoginRequest;
+import com.livingframe.business.dto.BizProfileUpdateRequest;
 import com.livingframe.business.entity.BizUser;
 import com.livingframe.business.mapper.BizUserMapper;
 import com.livingframe.business.vo.BizMeResponse;
@@ -13,6 +14,7 @@ import com.livingframe.common.context.LoginUserContext;
 import com.livingframe.common.enums.UserType;
 import com.livingframe.common.exception.BusinessException;
 import com.livingframe.common.model.LoginUser;
+import com.livingframe.common.util.MaskUtils;
 import com.livingframe.system.dto.ChangePasswordRequest;
 import com.livingframe.system.enums.LoginFailureAction;
 import com.livingframe.system.service.CaptchaService;
@@ -92,6 +94,7 @@ public class BizAuthService {
         loginSecurityService.recordSuccess(username, UserType.BUSINESS, ip, userAgent, user.getId());
 
         user.setLastLoginAt(LocalDateTime.now());
+        user.setLastActiveAt(LocalDateTime.now());
         bizUserMapper.updateById(user);
 
         return new LoginResponse(
@@ -114,10 +117,40 @@ public class BizAuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
-                user.getPhone(),
-                user.getEmail(),
+                MaskUtils.maskPhone(user.getPhone()),
+                MaskUtils.maskEmail(user.getEmail()),
                 user.getAvatar(),
                 UserType.BUSINESS);
+    }
+
+    public void heartbeat() {
+        LoginUser loginUser = LoginUserContext.require();
+        BizUser user = bizUserMapper.selectById(loginUser.getId());
+        if (user == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "业务用户不存在");
+        }
+        user.setLastActiveAt(LocalDateTime.now());
+        bizUserMapper.updateById(user);
+    }
+
+    public BizMeResponse updateProfile(BizProfileUpdateRequest request) {
+        LoginUser loginUser = LoginUserContext.require();
+        BizUser user = bizUserMapper.selectById(loginUser.getId());
+        if (user == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "业务用户不存在");
+        }
+        user.setNickname(request.nickname().trim());
+        if (!MaskUtils.isMasked(request.phone())) {
+            user.setPhone(request.phone() == null ? null : request.phone().trim());
+        }
+        if (!MaskUtils.isMasked(request.email())) {
+            user.setEmail(request.email() == null ? null : request.email().trim());
+        }
+        if (request.avatar() != null) {
+            user.setAvatar(request.avatar().trim());
+        }
+        bizUserMapper.updateById(user);
+        return me();
     }
 
     public void logout() {

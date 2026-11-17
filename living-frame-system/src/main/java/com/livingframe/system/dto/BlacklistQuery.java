@@ -10,5 +10,6 @@ public class BlacklistQuery extends PageQuery {
 
     private String targetType;
     private String targetValue;
+    private String userScope;
     private Integer status;
 }

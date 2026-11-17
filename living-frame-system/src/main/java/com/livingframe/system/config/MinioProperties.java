@@ -9,9 +9,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.minio")
 public class MinioProperties {
 
-    private String endpoint = "http://localhost:9000";
-    private String accessKey = "minioadmin";
-    private String secretKey = "minioadmin";
+    private String endpoint = "http://192.168.28.212:9510";
+    private String accessKey = "admin";
+    private String secretKey = "Minio@123456";
     private String defaultBucket = "living-frame";
     private long presignedExpirySeconds = 3600;
 }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadRequestOptions } from 'element-plus'
-import { Delete, Edit, Key, Plus, Refresh, Search, Upload, UserFilled } from '@element-plus/icons-vue'
+import { Delete, Edit, Key, Plus, Refresh, Search, Upload, UserFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import {
+  blacklistBusinessUser,
   createBusinessUser,
   deleteBusinessUser,
+  getBusinessUserActivity,
   getBusinessUsers,
   resetBusinessUserPassword,
   updateBusinessUser,
@@ -12,11 +14,13 @@ import {
 } from '@/api/business/user'
 import { uploadAvatar } from '@/api/avatar'
 import { resolveAvatarUrl } from '@/utils/avatar'
-import type { BusinessUserRecord } from '@/types/api'
+import type { BusinessUserActivity, BusinessUserRecord } from '@/types/api'
 
 const rows = ref<BusinessUserRecord[]>([])
 const total = ref(0)
 const loading = ref(false)
+const activity = ref<BusinessUserActivity | null>(null)
+const activityLoading = ref(false)
 
 const query = reactive({
   pageNum: 1,
@@ -71,7 +75,20 @@ const rules: FormRules = {
       trigger: 'blur',
     },
   ],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+  email: [{
+    validator: (_rule, value: string, callback) => {
+      if (!value || value.includes('*')) {
+        callback()
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        callback(new Error('邮箱格式不正确'))
+        return
+      }
+      callback()
+    },
+    trigger: 'blur',
+  }],
 }
 
 async function loadUsers() {
@@ -88,6 +105,19 @@ async function loadUsers() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadActivity() {
+  activityLoading.value = true
+  try {
+    activity.value = await getBusinessUserActivity()
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+async function refreshAll() {
+  await Promise.all([loadUsers(), loadActivity()])
 }
 
 function handleSearch() {
@@ -181,6 +211,7 @@ async function toggleStatus(row: BusinessUserRecord, value: string | number | bo
     await updateBusinessUserStatus(row.id, nextStatus)
     row.status = nextStatus
     ElMessage.success(nextStatus === 1 ? '业务用户已启用' : '业务用户已禁用')
+    await loadActivity()
   } catch {
     // 保持原状态
   }
@@ -220,7 +251,35 @@ async function handleResetPassword(row: BusinessUserRecord) {
   }
 }
 
-onMounted(loadUsers)
+async function handleBlacklist(row: BusinessUserRecord) {
+  if (row.blacklisted) return
+  try {
+    await ElMessageBox.confirm(
+      `确定将门户用户「${row.username}」加入永久黑名单并禁用账号吗？加入后该账号将无法登录。`,
+      '一键拉黑',
+      { type: 'warning', confirmButtonText: '加入黑名单', cancelButtonText: '取消' },
+    )
+    await blacklistBusinessUser(row.id)
+    ElMessage.success('已加入永久黑名单并禁用账号')
+    await refreshAll()
+  } catch {
+    // 用户取消
+  }
+}
+
+onMounted(async () => {
+  await refreshAll()
+})
+
+let activityTimer: number | undefined
+
+onMounted(() => {
+  activityTimer = window.setInterval(() => void loadActivity(), 30_000)
+})
+
+onUnmounted(() => {
+  if (activityTimer) window.clearInterval(activityTimer)
+})
 </script>
 
 <template>
@@ -233,6 +292,29 @@ onMounted(loadUsers)
       <el-button v-permission="'business:user:create'" type="primary" :icon="Plus" @click="openCreate">
         新增业务用户
       </el-button>
+    </div>
+
+    <div v-loading="activityLoading" class="activity-grid">
+      <div class="activity-card">
+        <span>门户用户总数</span>
+        <strong>{{ activity?.totalUsers ?? 0 }}</strong>
+        <small>今日新增 {{ activity?.newUsersToday ?? 0 }}</small>
+      </div>
+      <div class="activity-card online">
+        <span>当前在线</span>
+        <strong>{{ activity?.onlineUsers ?? 0 }}</strong>
+        <small>在线率 {{ activity?.onlineRate ?? 0 }}%</small>
+      </div>
+      <div class="activity-card today">
+        <span>今日活跃</span>
+        <strong>{{ activity?.todayActiveUsers ?? 0 }}</strong>
+        <small>活跃率 {{ activity?.todayActiveRate ?? 0 }}%</small>
+      </div>
+      <div class="activity-card seven">
+        <span>近 7 日活跃</span>
+        <strong>{{ activity?.sevenDayActiveUsers ?? 0 }}</strong>
+        <small>禁用 {{ activity?.disabledUsers ?? 0 }} · 黑名单 {{ activity?.blacklistedUsers ?? 0 }}</small>
+      </div>
     </div>
 
     <div class="card">
@@ -260,7 +342,7 @@ onMounted(loadUsers)
 
       <div class="table-wrap">
         <el-table v-loading="loading" :data="rows" row-key="id">
-          <el-table-column label="业务用户" min-width="210">
+          <el-table-column label="业务用户" min-width="190">
             <template #default="{ row }">
               <div class="user-cell">
                 <el-avatar :size="34" :src="resolveAvatarUrl(row.avatar)">
@@ -273,28 +355,35 @@ onMounted(loadUsers)
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="phone" label="手机号" width="140">
+          <el-table-column prop="phone" label="手机号" width="130">
             <template #default="{ row }">{{ row.phone || '—' }}</template>
           </el-table-column>
-          <el-table-column prop="email" label="邮箱" min-width="180">
+          <el-table-column prop="email" label="邮箱" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">{{ row.email || '—' }}</template>
           </el-table-column>
-          <el-table-column label="状态" width="80" align="center">
+          <el-table-column label="状态" width="70" align="center">
             <template #default="{ row }">
               <el-switch :model-value="row.status === 1" @change="(value) => toggleStatus(row as BusinessUserRecord, value)" />
             </template>
           </el-table-column>
-          <el-table-column prop="lastLoginAt" label="最后登录" width="165">
+          <el-table-column label="在线" width="70" align="center">
             <template #default="{ row }">
-              <span class="text-muted">{{ row.lastLoginAt || '从未登录' }}</span>
+              <el-tag :type="row.online ? 'success' : 'info'" effect="plain" size="small">
+                {{ row.online ? '在线' : '离线' }}
+              </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="createdAt" label="创建时间" width="165">
+          <el-table-column prop="lastActiveAt" label="最近活跃" width="160">
+            <template #default="{ row }">
+              <span class="text-muted">{{ row.lastActiveAt || '暂无活跃' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="创建时间" width="150">
             <template #default="{ row }">
               <span class="text-muted">{{ row.createdAt || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="130">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <el-tooltip content="编辑" placement="top">
                 <el-button
@@ -315,6 +404,19 @@ onMounted(loadUsers)
                   aria-label="重置密码"
                   @click="handleResetPassword(row as BusinessUserRecord)"
                 />
+              </el-tooltip>
+              <el-tooltip :content="row.blacklisted ? '已在黑名单中' : '加入黑名单'" placement="top">
+                <el-button
+                  v-permission="'business:user:update'"
+                  link
+                  type="danger"
+                  :icon="CircleCloseFilled"
+                  :disabled="row.blacklisted"
+                  aria-label="加入黑名单"
+                  @click="handleBlacklist(row as BusinessUserRecord)"
+                >
+                  拉黑
+                </el-button>
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
                 <el-button
@@ -399,6 +501,83 @@ onMounted(loadUsers)
 </template>
 
 <style scoped>
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.activity-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(31, 45, 70, 0.04);
+}
+
+.activity-card::after {
+  position: absolute;
+  top: -28px;
+  right: -20px;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgba(79, 107, 251, 0.08);
+  content: "";
+}
+
+.activity-card span {
+  display: block;
+  color: #8a94a6;
+  font-size: 11px;
+}
+
+.activity-card strong {
+  display: block;
+  margin: 7px 0 4px;
+  color: #263042;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.activity-card small {
+  color: #9aa3b5;
+  font-size: 10px;
+}
+
+.activity-card.online::after {
+  background: rgba(30, 167, 113, 0.12);
+}
+
+.activity-card.online strong {
+  color: #16835c;
+}
+
+.activity-card.today::after {
+  background: rgba(80, 107, 251, 0.13);
+}
+
+.activity-card.today strong {
+  color: #4f6bfb;
+}
+
+.activity-card.seven::after {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.activity-card.seven strong {
+  color: #7c4fe0;
+}
+
+@media (max-width: 1000px) {
+  .activity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .user-cell {
   display: flex;
   align-items: center;

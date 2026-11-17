@@ -11,4 +11,5 @@ public class OperationLogQuery extends PageQuery {
     private String username;
     private String operation;
     private String status;
+    private String userType;
 }

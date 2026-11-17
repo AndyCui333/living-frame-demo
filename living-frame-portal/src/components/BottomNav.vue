@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -42,6 +42,7 @@ const active = computed(() => (route.name === 'me' ? 'me' : 'home'))
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 -8px 26px rgba(39, 58, 99, 0.06);
   backdrop-filter: blur(16px);
+  touch-action: none;
 }
 
 .nav-item {
@@ -78,7 +79,7 @@ const active = computed(() => (route.name === 'me' ? 'me' : 'home'))
 
 @media (min-width: 560px) {
   .bottom-nav {
-    bottom: 24px;
+    bottom: 0;
     border-radius: 0 0 32px 32px;
   }
 }

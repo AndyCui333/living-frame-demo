@@ -21,6 +21,7 @@ public class LoginLogController {
     @GetMapping
     @PreAuthorize("@ss.hasPermi('system:login-log:list')")
     public R<PageResult<LoginLogVO>> page(LoginLogQuery query) {
+        query.setLoginType("ADMIN");
         return R.ok(loginLogService.page(query));
     }
 }

@@ -23,6 +23,7 @@ export interface OperationLogQuery extends Omit<PageQuery, 'status'> {
   username?: string
   operation?: string
   status?: string
+  userType?: string
 }
 
 export async function getLoginLogs(params: LoginLogQuery): Promise<PageResult<LoginLogRecord>> {
@@ -39,6 +40,30 @@ export async function getLoginLogs(params: LoginLogQuery): Promise<PageResult<Lo
 
 export async function getOperationLogs(params: OperationLogQuery): Promise<PageResult<OperationLogRecord>> {
   const page = await http.get<PageResult<RawOperationLog>>('/system/operation-logs', { params })
+  return {
+    ...page,
+    records: page.records.map((record) => ({
+      ...record,
+      id: toId(record.id),
+      userId: record.userId == null ? null : toId(record.userId),
+    })),
+  }
+}
+
+export async function getPortalLoginLogs(params: LoginLogQuery): Promise<PageResult<LoginLogRecord>> {
+  const page = await http.get<PageResult<RawLoginLog>>('/business/logs/login', { params })
+  return {
+    ...page,
+    records: page.records.map((record) => ({
+      ...record,
+      id: toId(record.id),
+      userId: record.userId == null ? null : toId(record.userId),
+    })),
+  }
+}
+
+export async function getPortalOperationLogs(params: OperationLogQuery): Promise<PageResult<OperationLogRecord>> {
+  const page = await http.get<PageResult<RawOperationLog>>('/business/logs/operation', { params })
   return {
     ...page,
     records: page.records.map((record) => ({

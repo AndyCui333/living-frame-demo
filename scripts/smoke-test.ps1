@@ -1,10 +1,10 @@
-param(
+﻿param(
     [string]$BaseUrl = 'http://127.0.0.1:8080',
     [string]$AdminUser = 'admin',
     [string]$AdminPassword = 'Admin@123',
-    [string]$RedisHost = 'localhost',
-    [int]$RedisPort = 6379,
-    [string]$RedisPassword = '',
+    [string]$RedisHost = '192.168.28.212',
+    [int]$RedisPort = 6854,
+    [string]$RedisPassword = 'Cjx991121!',
     [bool]$CaptchaEnabled = $true,
     [switch]$SkipAi
 )
@@ -30,9 +30,7 @@ function Get-RedisValue([string]$key) {
     $writer = New-Object System.IO.StreamWriter($stream, [System.Text.Encoding]::ASCII)
     $writer.NewLine = "`r`n"
     $writer.AutoFlush = $true
-    if ($RedisPassword) {
-        $writer.WriteLine('AUTH ' + $RedisPassword)
-    }
+    $writer.WriteLine('AUTH ' + $RedisPassword)
     $writer.WriteLine('GET ' + $key)
     $sb = New-Object System.Text.StringBuilder
     $buf = New-Object byte[] 4096

@@ -9,6 +9,9 @@ public record BizUserVO(
         String avatar,
         Integer status,
         String lastLoginAt,
+        String lastActiveAt,
+        boolean online,
+        boolean blacklisted,
         String createdAt
 ) {
 }

@@ -21,6 +21,7 @@ public class OperationLogController {
     @GetMapping
     @PreAuthorize("@ss.hasPermi('system:operation-log:list')")
     public R<PageResult<OperationLogVO>> page(OperationLogQuery query) {
+        query.setUserType("ADMIN");
         return R.ok(operationLogService.page(query));
     }
 }

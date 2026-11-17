@@ -15,6 +15,7 @@ import {
   Menu as MenuIcon,
   Setting,
   Tickets,
+  Trophy,
   User,
   Warning,
 } from '@element-plus/icons-vue'
@@ -41,6 +42,9 @@ const iconMap: Record<string, Component> = {
   'system:blacklist:list': Warning,
   'system:file:list': FolderOpened,
   'business:user:list': User,
+  'business:login-log:portal': Document,
+  'business:operation-log:portal': Tickets,
+  'business:statistics:list': DataBoard,
   'ai': MagicStick,
   'ai:chat': ChatDotRound,
   'ai:agent': Cpu,
@@ -48,6 +52,7 @@ const iconMap: Record<string, Component> = {
   'customer-service': Headset,
   'cs:chat:list': ChatDotRound,
   'cs:ticket:list': Tickets,
+  'cs:ranking:list': Trophy,
   dashboard: DataBoard,
 }
 
@@ -138,13 +143,52 @@ function iconFor(item: MenuNode): Component {
   color: #ffffff !important;
 }
 
+/* 一级菜单同样使用统一的浅色文字；黑名单是一级菜单，不能落回 Element Plus 默认黑色 */
+:deep(.el-menu > .el-menu-item) {
+  color: #aeb8cc !important;
+}
+
+:deep(.el-menu > .el-menu-item:hover) {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+:deep(.el-menu > .el-menu-item.is-active),
+:deep(.el-menu > .el-menu-item.is-active:hover) {
+  color: #ffffff !important;
+  background: linear-gradient(90deg, rgba(79, 107, 251, 0.95), rgba(124, 92, 255, 0.9)) !important;
+  box-shadow: 0 8px 18px rgba(79, 107, 251, 0.28);
+}
+
 :deep(.el-menu-item.is-active) {
-  color: #ffffff;
-  background: linear-gradient(90deg, rgba(79, 107, 251, 0.95), rgba(124, 92, 255, 0.9));
+  color: #ffffff !important;
+  background: linear-gradient(90deg, rgba(79, 107, 251, 0.95), rgba(124, 92, 255, 0.9)) !important;
   box-shadow: 0 8px 18px rgba(79, 107, 251, 0.28);
 }
 
 :deep(.el-sub-menu .el-menu-item) {
   min-width: auto;
+}
+</style>
+
+<style>
+/* el-menu 的一级菜单项不继承 SidebarMenu 的 scoped data-v，必须用全局选择器统一颜色。 */
+.sidebar-menu > .el-menu-item {
+  height: 46px;
+  margin: 4px 10px;
+  border-radius: 9px;
+  color: #aeb8cc !important;
+}
+
+.sidebar-menu > .el-menu-item:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.sidebar-menu > .el-menu-item.is-active,
+.sidebar-menu > .el-menu-item.is-active:hover {
+  color: #ffffff !important;
+  background: linear-gradient(90deg, rgba(79, 107, 251, 0.95), rgba(124, 92, 255, 0.9)) !important;
+  box-shadow: 0 8px 18px rgba(79, 107, 251, 0.28);
 }
 </style>

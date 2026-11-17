@@ -1,14 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { portalApi } from '../api'
 import { openChat } from '../chatState'
-import { resolveAvatar } from '../avatar'
-import { session } from '../session'
 
 const tickets = ref([])
-const displayName = computed(() => session.user?.nickname || session.user?.username || '朋友')
-const avatar = computed(() => resolveAvatar(session.user?.avatar))
-const activeCount = computed(() => tickets.value.filter((ticket) => ['ASSIGNED', 'PROCESSING', 'PENDING'].includes(ticket.status)).length)
+const activeCount = computed(() => tickets.value.filter((ticket) => ['ASSIGNED', 'PROCESSING', 'PENDING', 'WAIT_CONFIRM'].includes(ticket.status)).length)
 
 async function loadTickets() {
   try {
@@ -34,18 +30,6 @@ onMounted(loadTickets)
 
 <template>
   <div class="page-view home-page">
-    <header class="app-bar">
-      <div>
-        <span class="eyebrow">WELCOME BACK</span>
-        <h1>你好，{{ displayName }}</h1>
-        <p>今天也为你准备好了一切。</p>
-      </div>
-      <div class="avatar">
-        <img v-if="avatar" :src="avatar" alt="头像" />
-        <span v-else>{{ displayName.slice(0, 1).toUpperCase() }}</span>
-      </div>
-    </header>
-
     <section class="home-hero">
       <div class="hero-glow"></div>
       <div class="hero-copy">
@@ -70,6 +54,15 @@ onMounted(loadTickets)
       </div>
     </section>
 
+    <section class="service-status">
+      <span class="status-pulse"></span>
+      <div class="status-copy">
+        <strong>客服在线</strong>
+        <span>服务时间 09:00 - 21:00</span>
+      </div>
+      <span class="status-response">平均响应 1 分钟</span>
+    </section>
+
     <div class="section-title">
       <strong>快捷服务</strong>
       <span>为你精选</span>
@@ -82,26 +75,12 @@ onMounted(loadTickets)
         <strong>在线客服</strong>
         <span>即时沟通，创建工单</span>
       </button>
-      <button type="button" class="quick-card" @click="contact('TECH')">
-        <span class="quick-icon purple">
-          <svg viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14" /></svg>
-        </span>
-        <strong>技术支持</strong>
-        <span>系统问题，技术协助</span>
-      </button>
       <button type="button" class="quick-card" @click="contact('CHAT', true)">
         <span class="quick-icon mint">
           <svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
         </span>
         <strong>我的工单</strong>
-        <span>查看历史沟通记录</span>
-      </button>
-      <button type="button" class="quick-card" @click="contact('CHAT')">
-        <span class="quick-icon amber">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M9.6 9.2a2.5 2.5 0 0 1 4.9.1c0 1.8-2.5 2.1-2.5 4M12 17.2v.1" /></svg>
-        </span>
-        <strong>使用帮助</strong>
-        <span>常见问题快速解答</span>
+        <span>查看全部工单记录</span>
       </button>
     </section>
 
@@ -128,30 +107,80 @@ onMounted(loadTickets)
           <span>{{ ticket.ticketNo }} · {{ formatDate(ticket.updatedAt) }}</span>
         </div>
         <span class="recent-status" :class="ticket.status.toLowerCase()">
-          {{ ticket.status === 'ARCHIVED' ? '已归档' : ticket.status === 'PROCESSING' ? '沟通中' : ticket.status === 'ASSIGNED' ? '已接单' : '等待中' }}
+          {{ ticket.status === 'ARCHIVED' ? '已完结' : ticket.status === 'WAIT_CONFIRM' ? '待确认' : ticket.status === 'PROCESSING' ? '沟通中' : ticket.status === 'ASSIGNED' ? '已接单' : '等待中' }}
         </span>
       </div>
     </section>
-
-    <p class="home-footer">Living Frame · 你的服务台</p>
   </div>
 </template>
 
 <style scoped>
 .home-page {
+  display: flex;
+  flex-direction: column;
   padding-top: calc(env(safe-area-inset-top, 0px) + 22px);
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 
 .home-hero {
   position: relative;
   display: flex;
   min-height: 218px;
-  margin-top: 24px;
+  margin-top: 8px;
   overflow: hidden;
   border-radius: 24px;
   color: #ffffff;
-  background: linear-gradient(125deg, #425df5 0%, #6b59f6 55%, #8e65ff 100%);
-  box-shadow: 0 18px 38px rgba(79, 94, 220, 0.28);
+  background:
+    radial-gradient(circle at 92% 12%, rgba(124, 92, 255, 0.55), transparent 34%),
+    linear-gradient(135deg, #18234a 0%, #253a8f 55%, #4f47d8 100%);
+  box-shadow: 0 20px 44px rgba(31, 47, 119, 0.3);
+}
+
+.service-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e8edf5;
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(48, 66, 103, 0.05);
+}
+
+.status-pulse {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #22b07d;
+  box-shadow: 0 0 0 5px rgba(34, 176, 125, 0.1);
+}
+
+.status-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.status-copy strong {
+  color: #263042;
+  font-size: 11px;
+}
+
+.status-copy span {
+  color: #9aa3b5;
+  font-size: 9px;
+}
+
+.status-response {
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: #4f6bfb;
+  background: #eef2ff;
+  font-size: 9px;
+  white-space: nowrap;
 }
 
 .hero-glow {
@@ -279,26 +308,45 @@ onMounted(loadTickets)
 }
 
 .quick-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   min-height: 116px;
-  padding: 14px;
+  padding: 15px;
   border: 1px solid rgba(230, 235, 244, 0.9);
-  border-radius: 17px;
-  background: #ffffff;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #ffffff, #fbfcff);
   box-shadow: 0 8px 22px rgba(48, 66, 103, 0.06);
   text-align: left;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.quick-card::after {
+  position: absolute;
+  top: 17px;
+  right: 16px;
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid #c3ccda;
+  border-right: 1.5px solid #c3ccda;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.quick-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(48, 66, 103, 0.1);
 }
 
 .quick-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  margin-bottom: 9px;
-  border-radius: 11px;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 10px;
+  border-radius: 12px;
 }
 
 .quick-icon.blue {
@@ -468,11 +516,4 @@ onMounted(loadTickets)
   background: #effaf2;
 }
 
-.home-footer {
-  margin: 30px 0 0;
-  color: #b4bcc9;
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-align: center;
-}
 </style>

@@ -18,6 +18,7 @@ public class SysOperationLog {
 
     private Long userId;
     private String username;
+    private String userType;
     private String operation;
     private String method;
     private String requestUri;

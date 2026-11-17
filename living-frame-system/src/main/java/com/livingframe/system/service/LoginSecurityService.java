@@ -24,7 +24,9 @@ public class LoginSecurityService {
     private final SystemBlacklistService blacklistService;
 
     public void assertNotBlocked(String username, UserType type, String ip, String userAgent) {
-        if (blacklistService.isBlocked("IP", ip) || blacklistService.isBlocked("USERNAME", username)) {
+        String userScope = type == UserType.BUSINESS ? "PORTAL" : "SYSTEM";
+        if (blacklistService.isBlocked("IP", ip)
+                || blacklistService.isBlocked(userScope, "USERNAME", username)) {
             String message = "当前 IP 或账号已被加入系统黑名单";
             loginLogService.recordFailure(username, type.name(), ip, userAgent, message, null);
             throw new BusinessException(403, message);

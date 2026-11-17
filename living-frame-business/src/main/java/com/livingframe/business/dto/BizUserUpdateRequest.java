@@ -1,6 +1,6 @@
 package com.livingframe.business.dto;
 
-import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record BizUserUpdateRequest(
@@ -10,7 +10,7 @@ public record BizUserUpdateRequest(
         @Size(max = 32, message = "手机号长度不能超过 32")
         String phone,
 
-        @Email(message = "邮箱格式不正确")
+        @Pattern(regexp = "^$|^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", message = "邮箱格式不正确")
         @Size(max = 128, message = "邮箱长度不能超过 128")
         String email,
 

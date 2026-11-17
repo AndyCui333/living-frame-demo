@@ -122,7 +122,22 @@ export interface BusinessUserRecord {
   avatar?: string
   status: number
   lastLoginAt?: string
+  lastActiveAt?: string
+  online: boolean
+  blacklisted: boolean
   createdAt?: string
+}
+
+export interface BusinessUserActivity {
+  totalUsers: number
+  onlineUsers: number
+  todayActiveUsers: number
+  sevenDayActiveUsers: number
+  newUsersToday: number
+  disabledUsers: number
+  blacklistedUsers: number
+  onlineRate: number
+  todayActiveRate: number
 }
 
 export interface AiStatus {
@@ -281,6 +296,8 @@ export interface CsAgent {
   serviceType: 'CHAT' | 'TECH'
   onlineStatus: 'IDLE' | 'BUSY' | 'OFFLINE'
   currentTicketId?: string | null
+  activeCount: number
+  capacity: number
 }
 
 export interface CsTicket {
@@ -289,10 +306,11 @@ export interface CsTicket {
   title: string
   content: string
   ticketType: 'CHAT' | 'TECH'
-  status: 'DRAFT' | 'PENDING' | 'ASSIGNED' | 'PROCESSING' | 'ARCHIVED'
+  status: 'DRAFT' | 'PENDING' | 'ASSIGNED' | 'PROCESSING' | 'WAIT_CONFIRM' | 'ARCHIVED'
   portalUserName: string
   assignedAgentId?: string | null
   assignedAgentName?: string
+  unread: boolean
   rating?: number | null
   feedback?: string | null
   assignedAt?: string | null
@@ -315,6 +333,24 @@ export interface CsTicketDetail {
   messages: CsMessage[]
 }
 
+export interface CsOnlineInbox {
+  activeCount: number
+  capacity: number
+  unreadCount: number
+  earliestUnreadTicketId?: string | null
+  unreadTickets: CsTicket[]
+}
+
+export interface CsRanking {
+  rank: number
+  agentUserId: string
+  name: string
+  serviceType: 'CHAT' | 'TECH'
+  processedCount: number
+  averageRating: number
+  ratingCount: number
+}
+
 export interface AgentResult {
   reply: string
 }
@@ -335,6 +371,7 @@ export interface OperationLogRecord {
   id: string
   userId?: string | null
   username?: string
+  userType?: string
   operation: string
   method?: string
   requestUri?: string
@@ -349,6 +386,7 @@ export interface BlacklistRecord {
   id: string
   targetType: 'IP' | 'USERNAME' | string
   targetValue: string
+  userScope: 'SYSTEM' | 'PORTAL' | string
   reason?: string
   status: number
   createdBy?: string
@@ -357,7 +395,20 @@ export interface BlacklistRecord {
 export interface BlacklistCreatePayload {
   targetType: 'IP' | 'USERNAME'
   targetValue: string
+  userScope?: 'SYSTEM' | 'PORTAL'
   reason: string
   status?: number
+}
+
+export interface BusinessUserStatistics {
+  totalUsers: number
+  enabledUsers: number
+  disabledUsers: number
+  onlineUsers: number
+  newUsersToday: number
+  newUsersSevenDays: number
+  blacklistedUsers: number
+  trend: Array<{ date: string; count: number }>
+  statusDistribution: Array<{ name: string; value: number }>
 }
 

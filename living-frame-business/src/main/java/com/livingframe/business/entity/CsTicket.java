@@ -27,6 +27,7 @@ public class CsTicket extends BaseEntity {
     private String status;
     private Long assignedAgentId;
     private LocalDateTime assignedAt;
+    private LocalDateTime agentReadAt;
     private LocalDateTime lastMessageAt;
     private LocalDateTime closedAt;
     private Integer rating;

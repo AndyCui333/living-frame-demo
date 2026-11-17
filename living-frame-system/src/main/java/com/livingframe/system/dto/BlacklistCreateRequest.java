@@ -15,6 +15,9 @@ public record BlacklistCreateRequest(
         @Size(max = 128, message = "黑名单目标过长")
         String targetValue,
 
+        @Pattern(regexp = "^(SYSTEM|PORTAL)$", message = "黑名单归属只能为 SYSTEM 或 PORTAL")
+        String userScope,
+
         @NotBlank(message = "请填写加入黑名单的完整原因")
         @Size(max = 500, message = "原因过长")
         String reason,

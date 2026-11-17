@@ -12,6 +12,7 @@ import com.livingframe.common.context.LoginUserContext;
 import com.livingframe.common.event.UserCreatedEvent;
 import com.livingframe.common.event.UserDeletedEvent;
 import com.livingframe.common.exception.BusinessException;
+import com.livingframe.common.util.MaskUtils;
 import com.livingframe.system.dto.AssignRolesRequest;
 import com.livingframe.system.dto.UserCreateRequest;
 import com.livingframe.system.dto.UserQuery;
@@ -122,8 +123,12 @@ public class SysUserService {
     public void update(Long id, UserUpdateRequest request) {
         SysUser user = requireUser(id);
         user.setNickname(request.nickname());
-        user.setEmail(request.email());
-        user.setPhone(request.phone());
+        if (!MaskUtils.isMasked(request.email())) {
+            user.setEmail(request.email());
+        }
+        if (!MaskUtils.isMasked(request.phone())) {
+            user.setPhone(request.phone());
+        }
         user.setAvatar(request.avatar());
         userMapper.updateById(user);
     }
@@ -271,8 +276,8 @@ public class SysUserService {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
-                user.getEmail(),
-                user.getPhone(),
+                user.getEmail() == null ? null : MaskUtils.maskEmail(user.getEmail()),
+                user.getPhone() == null ? null : MaskUtils.maskPhone(user.getPhone()),
                 user.getAvatar(),
                 user.getStatus(),
                 user.getLastLoginAt() == null ? null : DATE_TIME_FORMATTER.format(user.getLastLoginAt()),

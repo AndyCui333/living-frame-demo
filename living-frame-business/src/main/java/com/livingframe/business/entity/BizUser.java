@@ -28,4 +28,5 @@ public class BizUser extends BaseEntity {
     /** 1 启用，0 禁用。 */
     private Integer status;
     private LocalDateTime lastLoginAt;
+    private LocalDateTime lastActiveAt;
 }

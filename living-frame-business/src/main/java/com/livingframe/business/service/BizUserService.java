@@ -9,11 +9,16 @@ import com.livingframe.business.dto.BizUserQuery;
 import com.livingframe.business.dto.BizUserUpdateRequest;
 import com.livingframe.business.entity.BizUser;
 import com.livingframe.business.mapper.BizUserMapper;
+import com.livingframe.business.vo.BizUserActivityVO;
+import com.livingframe.business.vo.BizUserStatisticsVO;
 import com.livingframe.business.vo.BizUserVO;
 import com.livingframe.common.api.PageResult;
 import com.livingframe.common.api.ResultCode;
 import com.livingframe.common.constant.Constants;
 import com.livingframe.common.exception.BusinessException;
+import com.livingframe.common.util.MaskUtils;
+import com.livingframe.system.dto.BlacklistCreateRequest;
+import com.livingframe.system.service.SystemBlacklistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -22,10 +27,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 业务用户管理服务。
@@ -37,10 +48,12 @@ public class BizUserService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int ONLINE_MINUTES = 5;
 
     private final BizUserMapper bizUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final RedissonClient redissonClient;
+    private final SystemBlacklistService blacklistService;
 
     public PageResult<BizUserVO> page(BizUserQuery query) {
         query.normalize();
@@ -61,6 +74,84 @@ public class BizUserService {
 
     public BizUserVO get(Long id) {
         return toVO(requireUser(id));
+    }
+
+    public BizUserActivityVO activity() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime onlineAfter = now.minusMinutes(ONLINE_MINUTES);
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime sevenDaysAgo = now.minusDays(7);
+        long total = count(null);
+        long online = count(Wrappers.<BizUser>lambdaQuery()
+                .eq(BizUser::getStatus, Constants.STATUS_ENABLED)
+                .ge(BizUser::getLastActiveAt, onlineAfter));
+        long todayActive = count(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getLastActiveAt, todayStart));
+        long sevenDayActive = count(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getLastActiveAt, sevenDaysAgo));
+        long newUsersToday = count(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getCreatedAt, todayStart));
+        long disabled = count(Wrappers.<BizUser>lambdaQuery()
+                .eq(BizUser::getStatus, Constants.STATUS_DISABLED));
+        long blacklisted = blacklistService.countActiveByType("PORTAL", "USERNAME");
+        return new BizUserActivityVO(
+                total,
+                online,
+                todayActive,
+                sevenDayActive,
+                newUsersToday,
+                disabled,
+                blacklisted,
+                percentage(online, total),
+                percentage(todayActive, total));
+    }
+
+    public BizUserStatisticsVO statistics() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
+        LocalDateTime trendStart = today.minusDays(6).atStartOfDay();
+        long total = count(null);
+        long enabled = count(Wrappers.<BizUser>lambdaQuery()
+                .eq(BizUser::getStatus, Constants.STATUS_ENABLED));
+        long disabled = count(Wrappers.<BizUser>lambdaQuery()
+                .eq(BizUser::getStatus, Constants.STATUS_DISABLED));
+        long online = count(Wrappers.<BizUser>lambdaQuery()
+                .eq(BizUser::getStatus, Constants.STATUS_ENABLED)
+                .ge(BizUser::getLastActiveAt, now.minusMinutes(ONLINE_MINUTES)));
+        long todayNew = count(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getCreatedAt, today.atStartOfDay()));
+        long sevenDayNew = count(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getCreatedAt, trendStart));
+        long blacklisted = blacklistService.countActiveByType("PORTAL", "USERNAME");
+
+        List<BizUser> recentUsers = bizUserMapper.selectList(Wrappers.<BizUser>lambdaQuery()
+                .ge(BizUser::getCreatedAt, trendStart));
+        Map<LocalDate, Long> counts = recentUsers.stream()
+                .filter(user -> user.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(user -> user.getCreatedAt().toLocalDate(), Collectors.counting()));
+        List<BizUserStatisticsVO.DailyNew> trend = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            trend.add(new BizUserStatisticsVO.DailyNew(
+                    date.format(DateTimeFormatter.ofPattern("MM-dd")),
+                    counts.getOrDefault(date, 0L)));
+        }
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        statusCounts.put("启用", enabled);
+        statusCounts.put("禁用", disabled);
+        List<BizUserStatisticsVO.StatusSlice> statusDistribution = statusCounts.entrySet().stream()
+                .map(entry -> new BizUserStatisticsVO.StatusSlice(entry.getKey(), entry.getValue()))
+                .toList();
+        return new BizUserStatisticsVO(
+                total,
+                enabled,
+                disabled,
+                online,
+                todayNew,
+                sevenDayNew,
+                blacklisted,
+                trend,
+                statusDistribution);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -102,8 +193,12 @@ public class BizUserService {
     public void update(Long id, BizUserUpdateRequest request) {
         BizUser user = requireUser(id);
         user.setNickname(request.nickname());
-        user.setPhone(request.phone());
-        user.setEmail(request.email());
+        if (!MaskUtils.isMasked(request.phone())) {
+            user.setPhone(request.phone());
+        }
+        if (!MaskUtils.isMasked(request.email())) {
+            user.setEmail(request.email());
+        }
         user.setAvatar(request.avatar());
         bizUserMapper.updateById(user);
     }
@@ -133,6 +228,36 @@ public class BizUserService {
         kickout(id);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void blacklist(Long id) {
+        BizUser user = requireUser(id);
+        if (!blacklistService.isBlocked("PORTAL", "USERNAME", user.getUsername())) {
+            blacklistService.create(new BlacklistCreateRequest(
+                    "USERNAME",
+                    user.getUsername(),
+                    "PORTAL",
+                    "门户用户管理手动加入永久黑名单",
+                    1));
+        }
+        user.setStatus(Constants.STATUS_DISABLED);
+        bizUserMapper.updateById(user);
+        kickout(id);
+    }
+
+    public void heartbeat(Long id) {
+        BizUser user = bizUserMapper.selectById(id);
+        if (user == null) {
+            return;
+        }
+        user.setLastActiveAt(LocalDateTime.now());
+        bizUserMapper.updateById(user);
+    }
+
+    private long count(LambdaQueryWrapper<BizUser> wrapper) {
+        Long value = bizUserMapper.selectCount(wrapper);
+        return value == null ? 0 : value;
+    }
+
     private void kickout(Long userId) {
         try {
             cn.dev33.satoken.stp.StpUtil.kickout(Constants.BUSINESS_LOGIN_ID_PREFIX + userId);
@@ -150,15 +275,33 @@ public class BizUserService {
     }
 
     private BizUserVO toVO(BizUser user) {
+        LocalDateTime onlineAfter = LocalDateTime.now().minusMinutes(ONLINE_MINUTES);
+        boolean online = Objects.equals(user.getStatus(), Constants.STATUS_ENABLED)
+                && user.getLastActiveAt() != null
+                && user.getLastActiveAt().isAfter(onlineAfter);
         return new BizUserVO(
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
-                user.getPhone(),
-                user.getEmail(),
+                MaskUtils.maskPhone(user.getPhone()),
+                MaskUtils.maskEmail(user.getEmail()),
                 user.getAvatar(),
                 user.getStatus(),
-                user.getLastLoginAt() == null ? null : DATE_TIME_FORMATTER.format(user.getLastLoginAt()),
-                user.getCreatedAt() == null ? null : DATE_TIME_FORMATTER.format(user.getCreatedAt()));
+                format(user.getLastLoginAt()),
+                format(user.getLastActiveAt()),
+                online,
+                blacklistService.isBlocked("PORTAL", "USERNAME", user.getUsername()),
+                format(user.getCreatedAt()));
+    }
+
+    private double percentage(long value, long total) {
+        if (total <= 0) {
+            return 0;
+        }
+        return Math.round(value * 1000.0 / total) / 10.0;
+    }
+
+    private String format(LocalDateTime value) {
+        return value == null ? null : DATE_TIME_FORMATTER.format(value);
     }
 }

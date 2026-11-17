@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { portalApi } from './api'
+import { clearAllDrafts } from './drafts'
 import { clearToken, getToken, setToken } from './storage'
 
 export const session = reactive({
@@ -39,6 +40,7 @@ export async function logout() {
   } finally {
     session.token = ''
     session.user = null
+    clearAllDrafts()
     clearToken()
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, Refresh, Switch, Tickets, View } from '@element-plus/icons-vue'
 import {
@@ -8,6 +8,7 @@ import {
   getCsAgents,
   getCsTicketDetail,
   getCsTickets,
+  markCsTicketRead,
   transferCsTicket,
 } from '@/api/customerService'
 import { useAuthStore } from '@/stores/auth'
@@ -38,13 +39,15 @@ const statusLabels: Record<string, string> = {
   PENDING: '待派遣',
   ASSIGNED: '已接单',
   PROCESSING: '处理中',
-  ARCHIVED: '已归档',
+  WAIT_CONFIRM: '待用户确认完结',
+  ARCHIVED: '已完结',
 }
 
 function statusType(status: string): 'warning' | 'primary' | 'success' | 'info' {
   if (status === 'PENDING') return 'warning'
   if (status === 'ASSIGNED') return 'primary'
   if (status === 'PROCESSING') return 'success'
+  if (status === 'WAIT_CONFIRM') return 'warning'
   return 'info'
 }
 
@@ -76,7 +79,10 @@ async function openTransfer(ticket: CsTicket) {
   transferLoading.value = true
   selectedAgentId.value = ''
   try {
-    agents.value = await getCsAgents(ticket.ticketType)
+    const all = await getCsAgents()
+    agents.value = all.filter((agent) => ticket.ticketType === 'TECH'
+      ? agent.serviceType === 'TECH'
+      : ['CHAT', 'TECH'].includes(agent.serviceType))
   } finally {
     transferLoading.value = false
   }
@@ -96,12 +102,12 @@ async function confirmTransfer() {
 async function archive(ticket: CsTicket) {
   try {
     await ElMessageBox.confirm(
-      `确定对工单「${ticket.title}」执行截单归档吗？归档后门户用户可评价。`,
-      '截单归档',
-      { type: 'warning', confirmButtonText: '截单归档', cancelButtonText: '取消' },
+      `确定对工单「${ticket.title}」提交完结申请吗？必须由门户用户确认后才会结束，客服不能直接归档。`,
+      '申请完结',
+      { type: 'warning', confirmButtonText: '提交申请', cancelButtonText: '取消' },
     )
     await archiveCsTicket(ticket.id)
-    ElMessage.success('工单已归档')
+    ElMessage.success('已提交完结申请，等待门户用户确认')
     await loadTickets()
   } catch {
     // 用户取消
@@ -122,6 +128,9 @@ async function openDetail(ticket: CsTicket) {
     const detail = await getCsTicketDetail(ticket.id)
     activeTicket.value = detail.ticket
     detailMessages.value = detail.messages
+    if (detail.ticket.assignedAgentId) {
+      await markCsTicketRead(detail.ticket.id).catch(() => undefined)
+    }
   } finally {
     detailLoading.value = false
   }
@@ -132,7 +141,25 @@ function canOperate(ticket: CsTicket): boolean {
     && (isSuperAdmin.value || ticket.assignedAgentId === auth.user?.id)
 }
 
-onMounted(loadTickets)
+onMounted(() => {
+  void loadTickets()
+  refreshTimer = window.setInterval(refreshTickets, 5000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+})
+
+let refreshTimer: number | undefined
+
+async function refreshTickets() {
+  if (loading.value) return
+  try {
+    rows.value = await getCsTickets()
+  } catch {
+    // 下一轮继续刷新
+  }
+}
 </script>
 
 <template>
@@ -154,7 +181,8 @@ onMounted(loadTickets)
             <el-option label="待派遣" value="PENDING" />
             <el-option label="已接单" value="ASSIGNED" />
             <el-option label="处理中" value="PROCESSING" />
-            <el-option label="已归档" value="ARCHIVED" />
+            <el-option label="待用户确认完结" value="WAIT_CONFIRM" />
+            <el-option label="已完结" value="ARCHIVED" />
           </el-select>
           <el-select v-if="isSuperAdmin" v-model="typeFilter" placeholder="客服类型" clearable style="width: 140px">
             <el-option label="在线聊天" value="CHAT" />
@@ -228,7 +256,7 @@ onMounted(loadTickets)
                 :icon="CircleCheck"
                 @click="archive(row as CsTicket)"
               >
-                归档
+                申请完结
               </el-button>
             </template>
           </el-table-column>
@@ -245,15 +273,16 @@ onMounted(loadTickets)
         <el-option
           v-for="agent in agents"
           :key="agent.userId"
-          :label="`${agent.name} · ${agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线'}`"
+          :label="`${agent.name} · ${agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线'} · ${agent.activeCount}/${agent.capacity}`"
           :value="agent.userId"
-          :disabled="agent.onlineStatus !== 'IDLE' || agent.userId === activeTicket?.assignedAgentId"
+          :disabled="agent.onlineStatus !== 'IDLE' || agent.activeCount >= agent.capacity || agent.userId === activeTicket?.assignedAgentId"
         >
           <div class="agent-option">
             <span>{{ agent.name }} · {{ typeLabel(agent.serviceType) }}</span>
-            <el-tag size="small" :type="agent.onlineStatus === 'IDLE' ? 'success' : 'info'" effect="plain">
+            <span class="agent-load">
               {{ agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线' }}
-            </el-tag>
+              · {{ agent.activeCount }}/{{ agent.capacity }}
+            </span>
           </div>
         </el-option>
       </el-select>
@@ -325,6 +354,11 @@ onMounted(loadTickets)
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+
+.agent-load {
+  color: #7c8799;
+  font-size: 10px;
 }
 
 .ticket-detail h2 {

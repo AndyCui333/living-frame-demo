@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotRound, CircleCheck, Promotion, Refresh, Switch, Tickets } from '@element-plus/icons-vue'
 import {
@@ -8,10 +9,14 @@ import {
   getCsAgents,
   getCsTicketDetail,
   getCsTickets,
+  leaveCsTicket,
+  markCsTicketRead,
   replyCsTicket,
   transferCsTicket,
 } from '@/api/customerService'
 import type { CsAgent, CsMessage, CsTicket } from '@/types/api'
+
+const route = useRoute()
 
 const tickets = ref<CsTicket[]>([])
 const activeTicket = ref<CsTicket | null>(null)
@@ -28,7 +33,7 @@ const messagesEl = ref<HTMLElement>()
 
 const activeId = computed(() => activeTicket.value?.id)
 const canReply = computed(() => activeTicket.value !== null
-  && ['ASSIGNED', 'PROCESSING'].includes(activeTicket.value.status))
+  && ['ASSIGNED', 'PROCESSING', 'WAIT_CONFIRM'].includes(activeTicket.value.status))
 const canTransfer = computed(() => activeTicket.value !== null
   && ['ASSIGNED', 'PROCESSING'].includes(activeTicket.value.status))
 const canArchive = computed(() => activeTicket.value !== null
@@ -39,13 +44,15 @@ const statusLabels: Record<string, string> = {
   PENDING: '待派遣',
   ASSIGNED: '已接单',
   PROCESSING: '处理中',
-  ARCHIVED: '已归档',
+  WAIT_CONFIRM: '待用户确认完结',
+  ARCHIVED: '已完结',
 }
 
 function statusType(status: string): 'warning' | 'primary' | 'success' | 'info' {
   if (status === 'PENDING') return 'warning'
   if (status === 'ASSIGNED') return 'primary'
   if (status === 'PROCESSING') return 'success'
+  if (status === 'WAIT_CONFIRM') return 'warning'
   return 'info'
 }
 
@@ -86,6 +93,9 @@ async function openTicket(ticket: CsTicket) {
     const detail = await getCsTicketDetail(ticket.id)
     activeTicket.value = detail.ticket
     messages.value = detail.messages
+    if (detail.ticket.assignedAgentId) {
+      await markCsTicketRead(detail.ticket.id).catch(() => undefined)
+    }
     await scrollToBottom()
   } finally {
     detailLoading.value = false
@@ -113,7 +123,10 @@ async function openTransfer() {
   transferVisible.value = true
   selectedAgentId.value = ''
   try {
-    agents.value = await getCsAgents(activeTicket.value.ticketType)
+    const all = await getCsAgents()
+    agents.value = all.filter((agent) => activeTicket.value?.ticketType === 'TECH'
+      ? agent.serviceType === 'TECH'
+      : ['CHAT', 'TECH'].includes(agent.serviceType))
   } finally {
     transferLoading.value = false
   }
@@ -133,14 +146,20 @@ async function confirmTransfer() {
 async function confirmArchive() {
   if (!activeTicket.value) return
   try {
-    await ElMessageBox.confirm('截单后工单将归档，门户用户可以进行评价。确定继续吗？', '截单归档', {
-      type: 'warning',
-      confirmButtonText: '截单归档',
-      cancelButtonText: '取消',
-    })
+    await ElMessageBox.confirm(
+      '提交完结申请后，门户用户会收到确认提示；只有用户确认后工单才会真正结束并归档，客服不能单方面完结。',
+      '申请完结',
+      {
+        type: 'warning',
+        confirmButtonText: '提交申请',
+        cancelButtonText: '取消',
+      },
+    )
     await archiveCsTicket(activeTicket.value.id)
-    ElMessage.success('工单已归档')
+    ElMessage.success('已提交完结申请，等待用户确认')
     await loadTickets()
+    const refreshed = tickets.value.find((ticket) => ticket.id === activeTicket.value?.id)
+    if (refreshed) await openTicket(refreshed)
   } catch {
     // 用户取消
   }
@@ -160,7 +179,48 @@ async function scrollToBottom() {
   }
 }
 
-onMounted(() => loadTickets(false))
+onMounted(async () => {
+  await loadTickets(false)
+  const target = typeof route.query.ticket === 'string' ? route.query.ticket : ''
+  if (target) {
+    const ticket = tickets.value.find((item) => item.id === target)
+    if (ticket) {
+      await openTicket(ticket)
+    }
+  }
+  refreshTimer = window.setInterval(refreshSilently, 2500)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  const ticketId = activeId.value
+  if (ticketId) {
+    void leaveCsTicket(ticketId).catch(() => undefined)
+  }
+})
+
+let refreshTimer: number | undefined
+
+async function refreshSilently() {
+  if (loading.value || detailLoading.value || sending.value) return
+  try {
+    const list = await getCsTickets()
+    tickets.value = list
+    if (!activeId.value) return
+    const fresh = list.find((item) => item.id === activeId.value)
+    if (!fresh) return
+    const detail = await getCsTicketDetail(fresh.id)
+    const changed = messages.value.length !== detail.messages.length
+    activeTicket.value = detail.ticket
+    messages.value = detail.messages
+    if (detail.ticket.assignedAgentId) {
+      await markCsTicketRead(detail.ticket.id).catch(() => undefined)
+    }
+    if (changed) await scrollToBottom()
+  } catch {
+    // 下一轮继续刷新
+  }
+}
 </script>
 
 <template>
@@ -244,10 +304,20 @@ onMounted(() => loadTickets(false))
                 :icon="CircleCheck"
                 @click="confirmArchive"
               >
-                截单归档
+                申请完结
               </el-button>
             </div>
           </header>
+
+          <div v-if="activeTicket.status === 'ARCHIVED'" class="archived-banner">
+            该工单已结束，客服和用户都不能继续在此对话中发送消息；用户需要发起新工单。
+          </div>
+          <div v-else-if="activeTicket.status === 'WAIT_CONFIRM'" class="waiting-banner">
+            已提交完结申请，等待门户用户确认；确认前工单仍保持进行中。
+          </div>
+          <div v-else-if="activeTicket.status === 'PENDING'" class="waiting-banner">
+            当前暂无可用在线客服，工单正在排队等待。
+          </div>
 
           <div ref="messagesEl" v-loading="detailLoading" class="message-stream">
             <div
@@ -265,7 +335,7 @@ onMounted(() => loadTickets(false))
             <el-empty v-if="!detailLoading && !messages.length" description="还没有消息" :image-size="60" />
           </div>
 
-          <footer class="reply-box">
+          <footer v-if="activeTicket.status !== 'ARCHIVED'" class="reply-box">
             <el-input
               v-model="reply"
               type="textarea"
@@ -311,15 +381,16 @@ onMounted(() => loadTickets(false))
         <el-option
           v-for="agent in agents"
           :key="agent.userId"
-          :label="`${agent.name} · ${typeLabel(agent.serviceType)} · ${agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线'}`"
+          :label="`${agent.name} · ${typeLabel(agent.serviceType)} · ${agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线'} (${agent.activeCount}/${agent.capacity})`"
           :value="agent.userId"
-          :disabled="agent.onlineStatus !== 'IDLE' || agent.userId === activeTicket?.assignedAgentId"
+          :disabled="agent.onlineStatus !== 'IDLE' || agent.activeCount >= agent.capacity || agent.userId === activeTicket?.assignedAgentId"
         >
           <div class="agent-option">
             <span>{{ agent.name }} · {{ typeLabel(agent.serviceType) }}</span>
-            <el-tag size="small" :type="agent.onlineStatus === 'IDLE' ? 'success' : 'info'" effect="plain">
+            <span class="agent-load">
               {{ agent.onlineStatus === 'IDLE' ? '空闲' : agent.onlineStatus === 'BUSY' ? '忙碌' : '离线' }}
-            </el-tag>
+              · {{ agent.activeCount }}/{{ agent.capacity }}
+            </span>
           </div>
         </el-option>
       </el-select>
@@ -530,6 +601,26 @@ onMounted(() => loadTickets(false))
 
 .transfer-tip {
   margin-bottom: 14px;
+}
+
+.archived-banner,
+.waiting-banner {
+  padding: 10px 18px;
+  border-bottom: 1px solid #f1f3f7;
+  color: #8a6d3b;
+  background: #fffaf0;
+  font-size: 11px;
+  text-align: center;
+}
+
+.waiting-banner {
+  color: #4f6bfb;
+  background: #f3f7ff;
+}
+
+.agent-load {
+  color: #7c8799;
+  font-size: 10px;
 }
 
 .agent-option {

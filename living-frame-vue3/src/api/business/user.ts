@@ -1,5 +1,12 @@
 import { http } from '../request'
-import type { BusinessUserRecord, ID, PageQuery, PageResult } from '@/types/api'
+import type {
+  BusinessUserActivity,
+  BusinessUserRecord,
+  BusinessUserStatistics,
+  ID,
+  PageQuery,
+  PageResult,
+} from '@/types/api'
 import { toId } from '@/utils/id'
 
 interface RawBusinessUser extends Omit<BusinessUserRecord, 'id'> {
@@ -29,6 +36,18 @@ function normalizeBusinessUser(raw: RawBusinessUser): BusinessUserRecord {
 export async function getBusinessUsers(params: PageQuery): Promise<PageResult<BusinessUserRecord>> {
   const page = await http.get<PageResult<RawBusinessUser>>('/business/users', { params })
   return { ...page, records: page.records.map(normalizeBusinessUser) }
+}
+
+export function getBusinessUserActivity(): Promise<BusinessUserActivity> {
+  return http.get<BusinessUserActivity>('/business/users/activity')
+}
+
+export function getBusinessUserStatistics(): Promise<BusinessUserStatistics> {
+  return http.get<BusinessUserStatistics>('/business/users/statistics')
+}
+
+export function blacklistBusinessUser(id: ID): Promise<void> {
+  return http.post<void>(`/business/users/${id}/blacklist`)
 }
 
 export function createBusinessUser(payload: BusinessUserCreatePayload): Promise<ID> {

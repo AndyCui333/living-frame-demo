@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { openChat } from '../chatState'
@@ -8,7 +8,6 @@ import { logout, session } from '../session'
 const router = useRouter()
 const displayName = computed(() => session.user?.nickname || session.user?.username || '门户用户')
 const avatar = computed(() => resolveAvatar(session.user?.avatar))
-const account = computed(() => session.user?.username || '')
 
 function contact() {
   openChat('CHAT')
@@ -16,6 +15,14 @@ function contact() {
 
 function history() {
   openChat('CHAT', true)
+}
+
+function editProfile() {
+  void router.push('/me/profile')
+}
+
+function changePassword() {
+  void router.push('/me/password')
 }
 
 async function signOut() {
@@ -26,31 +33,18 @@ async function signOut() {
 
 <template>
   <div class="page-view me-page">
-    <header class="app-bar">
-      <div>
-        <span class="eyebrow">MY SPACE</span>
-        <h1>我的</h1>
-        <p>管理你的账户与沟通记录。</p>
-      </div>
-    </header>
-
-    <section class="profile-card">
+    <section class="profile-card" role="button" tabindex="0" @click="editProfile">
       <div class="profile-avatar">
         <img v-if="avatar" :src="avatar" alt="头像" />
         <span v-else>{{ displayName.slice(0, 1).toUpperCase() }}</span>
       </div>
       <div class="profile-copy">
         <strong>{{ displayName }}</strong>
-        <span>@{{ account }}</span>
-        <span class="profile-badge">门户用户</span>
+        <span>点击查看和编辑</span>
       </div>
-      <button type="button" class="profile-service" aria-label="联系客服" @click="contact">
-        <svg viewBox="0 0 24 24">
-          <path d="M4.8 13.3v-1.5a7.2 7.2 0 0 1 14.4 0v1.5" />
-          <rect x="3.5" y="13" width="4.2" height="6.2" rx="2.1" />
-          <rect x="16.3" y="13" width="4.2" height="6.2" rx="2.1" />
-        </svg>
-      </button>
+      <span class="profile-chevron">
+        <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg>
+      </span>
     </section>
 
     <div class="section-title">
@@ -58,16 +52,6 @@ async function signOut() {
       <span>随时为你</span>
     </div>
     <section class="menu-card card">
-      <button type="button" class="menu-item" @click="history">
-        <span class="menu-icon blue">
-          <svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
-        </span>
-        <span class="menu-copy">
-          <strong>历史工单</strong>
-          <span>查看所有客服沟通记录</span>
-        </span>
-        <svg class="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg>
-      </button>
       <button type="button" class="menu-item" @click="contact">
         <span class="menu-icon purple">
           <svg viewBox="0 0 24 24"><path d="M5 6.5h14v9H9l-4 3v-12Z" /><path d="M8.5 10h7M8.5 13h4" /></svg>
@@ -78,58 +62,79 @@ async function signOut() {
         </span>
         <svg class="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg>
       </button>
+      <button type="button" class="menu-item" @click="history">
+        <span class="menu-icon blue">
+          <svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+        </span>
+        <span class="menu-copy">
+          <strong>我的工单</strong>
+          <span>查看所有客服沟通记录</span>
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg>
+      </button>
     </section>
 
-    <section class="account-card card">
-      <div class="account-row">
-        <span>账号</span>
-        <strong>@{{ account }}</strong>
+    <section class="assurance-card">
+      <div class="assurance-head">
+        <strong>服务保障</strong>
+        <span>安心使用</span>
       </div>
-      <div class="account-row">
-        <span>手机号</span>
-        <strong>{{ session.user?.phone || '未设置' }}</strong>
-      </div>
-      <div class="account-row">
-        <span>邮箱</span>
-        <strong>{{ session.user?.email || '未设置' }}</strong>
+      <div class="assurance-items">
+        <span><i></i>隐私加密</span>
+        <span><i></i>工单可追溯</span>
+        <span><i></i>专属客服</span>
       </div>
     </section>
 
-    <button type="button" class="logout-button" @click="signOut">退出登录</button>
-
-    <p class="me-footer">Living Frame Portal · v1.0.0</p>
+    <div class="me-bottom">
+      <div class="account-actions">
+        <button type="button" class="account-button" @click="changePassword">修改密码</button>
+        <button type="button" class="account-button danger" @click="signOut">退出登录</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .me-page {
+  display: flex;
+  flex-direction: column;
   padding-top: calc(env(safe-area-inset-top, 0px) + 22px);
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 
 .profile-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 24px;
+  margin-top: 8px;
   padding: 18px;
-  border: 1px solid rgba(230, 235, 244, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
-  background: linear-gradient(125deg, #ffffff, #f7f9ff);
-  box-shadow: var(--portal-shadow);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(124, 92, 255, 0.5), transparent 34%),
+    linear-gradient(135deg, #18234a, #2b3c84 70%, #3e3b9e);
+  box-shadow: 0 18px 38px rgba(31, 47, 119, 0.24);
+  cursor: pointer;
+}
+
+.profile-card:focus-visible {
+  outline: 2px solid #b9c6ff;
+  outline-offset: 2px;
 }
 
 .profile-avatar {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
+  width: 66px;
+  height: 66px;
+  flex: 0 0 66px;
   overflow: hidden;
-  border: 3px solid #ffffff;
+  border: 3px solid rgba(255, 255, 255, 0.9);
   border-radius: 21px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #4f6bfb, #7658ff);
-  box-shadow: 0 8px 20px rgba(79, 107, 251, 0.24);
+  color: #4f6bfb;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(13, 22, 52, 0.25);
   font-size: 22px;
   font-weight: 700;
 }
@@ -150,52 +155,91 @@ async function signOut() {
 
 .profile-copy strong {
   overflow: hidden;
-  color: #1d2738;
-  font-size: 17px;
+  color: #ffffff;
+  font-size: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .profile-copy > span {
-  color: #9aa3b5;
+  color: rgba(255, 255, 255, 0.62);
   font-size: 10px;
 }
 
-.profile-copy .profile-badge {
-  align-self: flex-start;
-  margin-top: 3px;
-  padding: 2px 7px;
-  border-radius: 6px;
-  color: #4f6bfb;
-  background: #eef2ff;
-  font-size: 9px;
-}
-
-.profile-service {
+.profile-chevron {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border: 1px solid #e4e9ff;
-  border-radius: 13px;
-  color: #4f6bfb;
-  background: #f4f6ff;
-  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  color: rgba(255, 255, 255, 0.65);
 }
 
-.profile-service svg {
-  width: 20px;
-  height: 20px;
+.profile-chevron svg {
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.6;
+  stroke-width: 1.7;
 }
 
 .menu-card {
   overflow: hidden;
+}
+
+.assurance-card {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e8edf5;
+  border-radius: 17px;
+  background: linear-gradient(120deg, #f7f9ff, #ffffff);
+  box-shadow: 0 8px 20px rgba(48, 66, 103, 0.04);
+}
+
+.assurance-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.assurance-head strong {
+  color: #3d4960;
+  font-size: 11px;
+}
+
+.assurance-head span {
+  color: #a0a9b8;
+  font-size: 9px;
+}
+
+.assurance-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assurance-items span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 9px;
+  color: #6b778c;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.assurance-items i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: #4f8dfb;
 }
 
 .menu-item {
@@ -271,55 +315,32 @@ async function signOut() {
   stroke-width: 1.6;
 }
 
-.account-card {
-  margin-top: 14px;
-  padding: 6px 14px;
+.me-bottom {
+  margin-top: auto;
+  padding-top: 24px;
 }
 
-.account-row {
+.account-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 0;
-  border-bottom: 1px solid #f3f5f9;
+  flex-direction: column;
+  gap: 9px;
 }
 
-.account-row:last-child {
-  border-bottom: 0;
-}
-
-.account-row span {
-  color: #9aa3b5;
-  font-size: 10px;
-}
-
-.account-row strong {
-  overflow: hidden;
-  color: #49546a;
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.logout-button {
+.account-button {
   width: 100%;
   height: 44px;
-  margin-top: 22px;
-  border: 1px solid #f2e6e6;
+  border: 1px solid #e4e9ff;
   border-radius: 14px;
-  color: #c45b5b;
-  background: #fffafa;
+  color: #4f6bfb;
+  background: #f7f9ff;
   font-size: 11px;
   cursor: pointer;
 }
 
-.me-footer {
-  margin: 30px 0 0;
-  color: #b4bcc9;
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-align: center;
+.account-button.danger {
+  border-color: #f2e6e6;
+  color: #c45b5b;
+  background: #fffafa;
 }
+
 </style>

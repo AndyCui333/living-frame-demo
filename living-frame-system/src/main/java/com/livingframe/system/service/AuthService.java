@@ -18,6 +18,7 @@ import com.livingframe.system.mapper.SysRoleMapper;
 import com.livingframe.system.mapper.SysUserMapper;
 import com.livingframe.system.util.IpUtils;
 import com.livingframe.system.vo.LoginResponse;
+import com.livingframe.common.util.MaskUtils;
 import com.livingframe.system.vo.MeResponse;
 import com.livingframe.system.vo.PermissionVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -111,8 +112,8 @@ public class AuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
-                user.getEmail(),
-                user.getPhone(),
+                user.getEmail() == null ? null : MaskUtils.maskEmail(user.getEmail()),
+                user.getPhone() == null ? null : MaskUtils.maskPhone(user.getPhone()),
                 user.getAvatar(),
                 UserType.ADMIN,
                 loginUser.getRoles(),

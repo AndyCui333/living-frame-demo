@@ -10,6 +10,41 @@ export const useAuthStore = defineStore('auth', () => {
   const menus = ref<MenuNode[]>([])
   const loading = ref(false)
 
+  function withHomeMenu(menuTree: MenuNode[]): MenuNode[] {
+    const hasHome = menuTree.some((item) => item.code === 'dashboard' || item.path === '/dashboard')
+    const hasRanking = menuTree.some((item) => item.code === 'cs:ranking:list'
+      || item.path === '/customer-service/ranking'
+      || item.children?.some((child) => child.code === 'cs:ranking:list' || child.path === '/customer-service/ranking'))
+    const next = [...menuTree]
+    if (!hasHome) {
+      next.unshift({
+        id: 'dashboard-home',
+        code: 'dashboard',
+        name: '首页',
+        type: 'MENU',
+        parentId: '0',
+        path: '/dashboard',
+        sort: 0,
+        status: 1,
+        children: [],
+      })
+    }
+    if (!hasRanking) {
+      next.push({
+        id: 'cs-ranking',
+        code: 'cs:ranking:list',
+        name: '客服排行',
+        type: 'MENU',
+        parentId: '0',
+        path: '/customer-service/ranking',
+        sort: 6,
+        status: 1,
+        children: [],
+      })
+    }
+    return next
+  }
+
   const displayName = computed(() => user.value?.nickname || user.value?.username || '未登录')
   const isSuperAdmin = computed(() => user.value?.superAdmin === true)
   const permissionSet = computed(() => new Set(user.value?.permissions ?? []))
@@ -24,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function loadProfile(): Promise<void> {
     const [profile, menuTree] = await Promise.all([getMe(), getMenus()])
     user.value = profile
-    menus.value = menuTree
+    menus.value = withHomeMenu(menuTree)
   }
 
   async function login(payload: LoginPayload): Promise<LoginResult> {

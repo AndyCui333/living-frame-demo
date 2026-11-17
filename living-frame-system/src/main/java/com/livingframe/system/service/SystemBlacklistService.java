@@ -33,14 +33,37 @@ public class SystemBlacklistService {
     private final SysBlacklistMapper blacklistMapper;
 
     public boolean isBlocked(String targetType, String targetValue) {
+        return isBlocked(null, targetType, targetValue);
+    }
+
+    public boolean isBlocked(String userScope, String targetType, String targetValue) {
         if (StrUtil.isBlank(targetType) || StrUtil.isBlank(targetValue)) {
             return false;
         }
-        Long count = blacklistMapper.selectCount(Wrappers.<SysBlacklist>lambdaQuery()
+        var wrapper = Wrappers.<SysBlacklist>lambdaQuery()
                 .eq(SysBlacklist::getTargetType, normalizeType(targetType))
                 .eq(SysBlacklist::getTargetValue, targetValue.trim())
-                .eq(SysBlacklist::getStatus, 1));
+                .eq(SysBlacklist::getStatus, 1);
+        if (StrUtil.isNotBlank(userScope)) {
+            wrapper.eq(SysBlacklist::getUserScope, normalizeScope(userScope));
+        }
+        Long count = blacklistMapper.selectCount(wrapper);
         return count != null && count > 0;
+    }
+
+    public long countActiveByType(String targetType) {
+        return countActiveByType(null, targetType);
+    }
+
+    public long countActiveByType(String userScope, String targetType) {
+        var wrapper = Wrappers.<SysBlacklist>lambdaQuery()
+                .eq(SysBlacklist::getTargetType, normalizeType(targetType))
+                .eq(SysBlacklist::getStatus, 1);
+        if (StrUtil.isNotBlank(userScope)) {
+            wrapper.eq(SysBlacklist::getUserScope, normalizeScope(userScope));
+        }
+        Long count = blacklistMapper.selectCount(wrapper);
+        return count == null ? 0 : count;
     }
 
     /**
@@ -64,6 +87,7 @@ public class SystemBlacklistService {
             SysBlacklist record = new SysBlacklist()
                     .setTargetType("IP")
                     .setTargetValue(ip.trim())
+                    .setUserScope("SYSTEM")
                     .setReason(reason)
                     .setStatus(1)
                     .setCreatedBy("SYSTEM");
@@ -82,6 +106,9 @@ public class SystemBlacklistService {
         if (StrUtil.isNotBlank(query.getTargetValue())) {
             wrapper.like(SysBlacklist::getTargetValue, query.getTargetValue().trim());
         }
+        if (StrUtil.isNotBlank(query.getUserScope())) {
+            wrapper.eq(SysBlacklist::getUserScope, normalizeScope(query.getUserScope()));
+        }
         if (query.getStatus() != null) {
             wrapper.eq(SysBlacklist::getStatus, query.getStatus());
         }
@@ -95,17 +122,20 @@ public class SystemBlacklistService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(BlacklistCreateRequest request) {
         String type = normalizeType(request.targetType());
+        String scope = normalizeScope(request.userScope());
         String value = request.targetValue().trim();
         Long exists = blacklistMapper.selectCount(Wrappers.<SysBlacklist>lambdaQuery()
                 .eq(SysBlacklist::getTargetType, type)
-                .eq(SysBlacklist::getTargetValue, value));
+                .eq(SysBlacklist::getTargetValue, value)
+                .eq(SysBlacklist::getUserScope, scope));
         if (exists != null && exists > 0) {
-            throw new BusinessException(ResultCode.CONFLICT, "该目标已在系统黑名单中");
+            throw new BusinessException(ResultCode.CONFLICT, "该目标已在黑名单中");
         }
         LoginUser loginUser = LoginUserContext.get();
         SysBlacklist record = new SysBlacklist()
                 .setTargetType(type)
                 .setTargetValue(value)
+                .setUserScope(scope)
                 .setReason(request.reason().trim())
                 .setStatus(request.status() == null ? 1 : request.status())
                 .setCreatedBy(loginUser == null ? "SYSTEM" : loginUser.getUsername());
@@ -142,11 +172,23 @@ public class SystemBlacklistService {
         return normalized;
     }
 
+    private String normalizeScope(String scope) {
+        if (StrUtil.isBlank(scope)) {
+            return "SYSTEM";
+        }
+        String normalized = scope.trim().toUpperCase(Locale.ROOT);
+        if (!"SYSTEM".equals(normalized) && !"PORTAL".equals(normalized)) {
+            throw new BusinessException("黑名单归属只能为 SYSTEM 或 PORTAL");
+        }
+        return normalized;
+    }
+
     private BlacklistVO toVO(SysBlacklist entity) {
         return new BlacklistVO(
                 entity.getId(),
                 entity.getTargetType(),
                 entity.getTargetValue(),
+                entity.getUserScope(),
                 entity.getReason(),
                 entity.getStatus(),
                 entity.getCreatedBy());

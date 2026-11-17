@@ -95,12 +95,14 @@ CREATE TABLE IF NOT EXISTS `biz_user`
     `avatar`        VARCHAR(255) DEFAULT NULL COMMENT '头像',
     `status`        TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
     `last_login_at` DATETIME     DEFAULT NULL COMMENT '最后登录时间',
+    `last_active_at` DATETIME    DEFAULT NULL COMMENT '最后活跃时间',
     `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted`       TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_biz_user_username` (`username`),
-    KEY `idx_biz_user_status` (`status`)
+    KEY `idx_biz_user_status` (`status`),
+    KEY `idx_biz_user_active` (`last_active_at`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='业务用户';
@@ -163,13 +165,34 @@ CREATE TABLE IF NOT EXISTS `ai_message`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='AI 对话消息（长期记忆源）';
 
+CREATE TABLE IF NOT EXISTS `biz_notification`
+(
+    `id`          BIGINT       NOT NULL COMMENT '主键',
+    `user_id`     BIGINT       NOT NULL COMMENT '门户用户 ID',
+    `type`        VARCHAR(32)  NOT NULL DEFAULT 'CS_MESSAGE' COMMENT '通知类型',
+    `title`       VARCHAR(128) NOT NULL COMMENT '通知标题',
+    `content`     VARCHAR(500) DEFAULT NULL COMMENT '通知摘要',
+    `target_type` VARCHAR(32)  DEFAULT NULL COMMENT '跳转目标类型',
+    `target_id`   BIGINT       DEFAULT NULL COMMENT '跳转目标 ID',
+    `read_status` TINYINT      NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
+    `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_biz_notification_user` (`user_id`, `read_status`),
+    KEY `idx_biz_notification_time` (`created_at`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='门户通知';
+
 CREATE TABLE IF NOT EXISTS `cs_agent_profile`
 (
     `id`                BIGINT      NOT NULL COMMENT '主键',
     `user_id`           BIGINT      NOT NULL COMMENT '客服后台用户 ID',
     `service_type`      VARCHAR(16) NOT NULL COMMENT 'CHAT/TECH',
     `online_status`     VARCHAR(16) NOT NULL DEFAULT 'IDLE' COMMENT 'IDLE/BUSY/OFFLINE',
-    `current_ticket_id` BIGINT      DEFAULT NULL COMMENT '当前处理工单',
+    `current_ticket_id` BIGINT      DEFAULT NULL COMMENT '最近处理工单',
+    `last_seen_at`      DATETIME    DEFAULT NULL COMMENT '客服最近在线时间',
     `created_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `deleted`           TINYINT     NOT NULL DEFAULT 0,
@@ -191,6 +214,7 @@ CREATE TABLE IF NOT EXISTS `cs_ticket`
     `status`            VARCHAR(20)  NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/PENDING/ASSIGNED/PROCESSING/ARCHIVED',
     `assigned_agent_id` BIGINT       DEFAULT NULL COMMENT '接单客服用户 ID',
     `assigned_at`       DATETIME     DEFAULT NULL,
+    `agent_read_at`     DATETIME     DEFAULT NULL COMMENT '客服最近阅读时间',
     `last_message_at`   DATETIME     DEFAULT NULL,
     `closed_at`         DATETIME     DEFAULT NULL,
     `rating`            TINYINT      DEFAULT NULL COMMENT '1-5',
@@ -246,6 +270,7 @@ CREATE TABLE IF NOT EXISTS `sys_operation_log`
     `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
     `user_id`       BIGINT       DEFAULT NULL COMMENT '操作人 ID',
     `username`      VARCHAR(64)  DEFAULT NULL COMMENT '操作人',
+    `user_type`     VARCHAR(16)  DEFAULT NULL COMMENT 'ADMIN/BUSINESS',
     `operation`     VARCHAR(128) NOT NULL COMMENT '操作描述',
     `method`        VARCHAR(16)  DEFAULT NULL COMMENT 'HTTP 方法',
     `request_uri`   VARCHAR(255) DEFAULT NULL COMMENT '请求地址',
@@ -256,7 +281,8 @@ CREATE TABLE IF NOT EXISTS `sys_operation_log`
     `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_operation_log_user` (`username`),
-    KEY `idx_operation_log_time` (`created_at`)
+    KEY `idx_operation_log_time` (`created_at`),
+    KEY `idx_operation_log_type` (`user_type`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='操作日志';
@@ -266,11 +292,12 @@ CREATE TABLE IF NOT EXISTS `sys_blacklist`
     `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
     `target_type`  VARCHAR(16)  NOT NULL COMMENT 'IP/USERNAME',
     `target_value` VARCHAR(128) NOT NULL COMMENT 'IP 或用户名',
+    `user_scope`   VARCHAR(16)  NOT NULL DEFAULT 'SYSTEM' COMMENT 'SYSTEM/PORTAL',
     `reason`       VARCHAR(500) DEFAULT NULL COMMENT '加入黑名单的完整原因',
     `status`       TINYINT      NOT NULL DEFAULT 1 COMMENT '1生效 0禁用',
     `created_by`   VARCHAR(64)  DEFAULT NULL COMMENT '创建人',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_sys_blacklist_target` (`target_type`, `target_value`),
+    UNIQUE KEY `uk_sys_blacklist_target` (`user_scope`, `target_type`, `target_value`),
     KEY `idx_sys_blacklist_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

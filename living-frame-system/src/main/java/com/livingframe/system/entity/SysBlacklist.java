@@ -16,6 +16,7 @@ public class SysBlacklist {
 
     private String targetType;
     private String targetValue;
+    private String userScope;
     private String reason;
     private Integer status;
     private String createdBy;

@@ -11,7 +11,8 @@ import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServic
 @MapperScan({"com.livingframe.system.mapper", "com.livingframe.business.mapper", "com.livingframe.ai.mapper"})
 public class LivingFrameApplication {
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
+        System.setProperty("io.netty.noUnsafe", "true");
         SpringApplication.run(LivingFrameApplication.class, args);
     }
 }

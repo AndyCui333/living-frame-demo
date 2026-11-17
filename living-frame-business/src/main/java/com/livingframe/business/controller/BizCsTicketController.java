@@ -1,5 +1,6 @@
 package com.livingframe.business.controller;
 
+import com.livingframe.business.dto.CsChatRequest;
 import com.livingframe.business.dto.CsMessageView;
 import com.livingframe.business.dto.CsTicketDetail;
 import com.livingframe.business.dto.CsTicketFeedbackRequest;
@@ -36,6 +37,13 @@ public class BizCsTicketController {
         return R.ok(ticketService.listPortalTickets(currentUserId()));
     }
 
+    @PostMapping("/chat")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<CsTicketDetail> chat(@Valid @RequestBody CsChatRequest request) {
+        return R.ok(ticketService.chat(
+                currentUserId(), request.ticketId(), request.content(), request.ticketType()));
+    }
+
     @PostMapping("/drafts")
     @PreAuthorize("@ss.hasRole('BIZ_USER')")
     public R<Long> createDraft(@Valid @RequestBody CsTicketSaveRequest request) {
@@ -68,11 +76,39 @@ public class BizCsTicketController {
         return R.ok(ticketService.detailForPortal(currentUserId(), id));
     }
 
+    @PostMapping("/{id}/read")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<Void> markRead(@PathVariable Long id) {
+        ticketService.markPortalRead(currentUserId(), id);
+        return R.ok();
+    }
+
+    @PostMapping("/{id}/leave")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<Void> leave() {
+        ticketService.leavePortalTicket(currentUserId());
+        return R.ok();
+    }
+
     @PostMapping("/{id}/messages")
     @PreAuthorize("@ss.hasRole('BIZ_USER')")
     public R<CsMessageView> message(@PathVariable Long id,
                                     @Valid @RequestBody CsTicketMessageRequest request) {
         return R.ok(ticketService.portalMessage(currentUserId(), id, request.content()));
+    }
+
+    @PostMapping("/{id}/confirm-complete")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<Void> confirmComplete(@PathVariable Long id) {
+        ticketService.confirmComplete(currentUserId(), id);
+        return R.ok();
+    }
+
+    @PostMapping("/{id}/reject-complete")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<Void> rejectComplete(@PathVariable Long id) {
+        ticketService.rejectComplete(currentUserId(), id);
+        return R.ok();
     }
 
     @PostMapping("/{id}/feedback")

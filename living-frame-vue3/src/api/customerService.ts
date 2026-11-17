@@ -1,5 +1,5 @@
 import { http } from './request'
-import type { CsAgent, CsMessage, CsTicket, CsTicketDetail } from '@/types/api'
+import type { CsAgent, CsMessage, CsOnlineInbox, CsRanking, CsTicket, CsTicketDetail } from '@/types/api'
 import { toId } from '@/utils/id'
 
 interface RawCsAgent extends Omit<CsAgent, 'id' | 'userId' | 'currentTicketId'> {
@@ -20,6 +20,15 @@ interface RawCsMessage extends Omit<CsMessage, 'id'> {
 interface RawCsTicketDetail {
   ticket: RawCsTicket
   messages: RawCsMessage[]
+}
+
+interface RawCsOnlineInbox extends Omit<CsOnlineInbox, 'earliestUnreadTicketId' | 'unreadTickets'> {
+  earliestUnreadTicketId?: string | number | null
+  unreadTickets: RawCsTicket[]
+}
+
+interface RawCsRanking extends Omit<CsRanking, 'agentUserId'> {
+  agentUserId: string | number
 }
 
 function mapTicket(ticket: RawCsTicket): CsTicket {
@@ -71,4 +80,32 @@ export function archiveCsTicket(id: string): Promise<void> {
 
 export function dispatchCsTicket(id: string): Promise<void> {
   return http.post<void>(`/cs/tickets/${id}/dispatch`)
+}
+
+export function markCsTicketRead(id: string): Promise<void> {
+  return http.post<void>(`/cs/tickets/${id}/read`)
+}
+
+export function leaveCsTicket(id: string): Promise<void> {
+  return http.post<void>(`/cs/tickets/${id}/leave`)
+}
+
+export function heartbeatCsAgent(): Promise<CsOnlineInbox> {
+  return http.post<RawCsOnlineInbox>('/cs/agents/heartbeat').then((inbox) => ({
+    ...inbox,
+    earliestUnreadTicketId: inbox.earliestUnreadTicketId === null || inbox.earliestUnreadTicketId === undefined
+      ? null
+      : toId(inbox.earliestUnreadTicketId),
+    unreadTickets: inbox.unreadTickets.map(mapTicket),
+  }))
+}
+
+export function offlineCsAgent(): Promise<void> {
+  return http.post<void>('/cs/agents/offline')
+}
+
+export function getCsRanking(): Promise<CsRanking[]> {
+  return http.get<RawCsRanking[]>('/cs/agents/ranking').then((items) =>
+    items.map((item) => ({ ...item, agentUserId: toId(item.agentUserId) })),
+  )
 }

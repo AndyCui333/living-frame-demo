@@ -88,7 +88,20 @@ const rules: FormRules = {
       trigger: 'blur',
     },
   ],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+  email: [{
+    validator: (_rule, value: string, callback) => {
+      if (!value || value.includes('*')) {
+        callback()
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        callback(new Error('邮箱格式不正确'))
+        return
+      }
+      callback()
+    },
+    trigger: 'blur',
+  }],
 }
 
 const roleDialogVisible = ref(false)

@@ -1,6 +1,7 @@
 package com.livingframe.business.controller;
 
 import com.livingframe.business.dto.BizLoginRequest;
+import com.livingframe.business.dto.BizProfileUpdateRequest;
 import com.livingframe.business.service.BizAuthService;
 import com.livingframe.business.vo.BizMeResponse;
 import com.livingframe.common.annotation.OperationLog;
@@ -41,6 +42,20 @@ public class BizAuthController {
     public R<Void> logout() {
         bizAuthService.logout();
         return R.ok();
+    }
+
+    @PostMapping("/heartbeat")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    public R<Void> heartbeat() {
+        bizAuthService.heartbeat();
+        return R.ok();
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("@ss.hasRole('BIZ_USER')")
+    @OperationLog("门户用户修改个人资料")
+    public R<BizMeResponse> updateProfile(@Valid @RequestBody BizProfileUpdateRequest request) {
+        return R.ok(bizAuthService.updateProfile(request));
     }
 
     @PutMapping("/password")

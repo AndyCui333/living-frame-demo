@@ -16,14 +16,16 @@ import { useAuthStore } from '@/stores/auth'
 import { getUsers } from '@/api/system/user'
 import { getRoles } from '@/api/system/role'
 import { getPermissionTree } from '@/api/system/permission'
-import { getBusinessUsers } from '@/api/business/user'
+import { getBusinessUsers, getBusinessUserActivity } from '@/api/business/user'
 import { getAiStatus } from '@/api/ai'
-import type { AiStatus } from '@/types/api'
+import type { AiStatus, BusinessUserActivity } from '@/types/api'
 
 const auth = useAuthStore()
 const router = useRouter()
 const loading = ref(true)
 const ai = ref<AiStatus | null>(null)
+const portal = ref<BusinessUserActivity | null>(null)
+const canViewPortal = computed(() => auth.hasPermission('business:user:list'))
 
 const stats = reactive({
   users: 0,
@@ -119,6 +121,11 @@ async function loadData() {
         stats.businessUsers = page.total
       }),
     )
+    tasks.push(
+      getBusinessUserActivity().then((data) => {
+        portal.value = data
+      }),
+    )
   }
 
   await Promise.allSettled(tasks)
@@ -166,6 +173,7 @@ onMounted(loadData)
       </div>
     </section>
 
+    <div class="section-label">管理端数据</div>
     <section class="stat-grid" v-loading="loading">
       <div class="stat-card">
         <div class="stat-icon icon-blue"><el-icon><User /></el-icon></div>
@@ -200,6 +208,44 @@ onMounted(loadData)
         </div>
       </div>
     </section>
+
+    <template v-if="canViewPortal">
+      <div class="section-label">门户端数据</div>
+      <section class="stat-grid portal-stat-grid" v-loading="loading">
+        <div class="stat-card">
+          <div class="stat-icon icon-cyan"><el-icon><User /></el-icon></div>
+          <div class="stat-body">
+            <span class="stat-label">门户用户</span>
+            <strong class="stat-value">{{ portal?.totalUsers ?? stats.businessUsers }}</strong>
+            <span class="stat-hint">门户端注册账号总数</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon icon-green"><el-icon><ChatDotRound /></el-icon></div>
+          <div class="stat-body">
+            <span class="stat-label">当前在线</span>
+            <strong class="stat-value">{{ portal?.onlineUsers ?? 0 }}</strong>
+            <span class="stat-hint">近 5 分钟有活跃心跳</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon icon-blue"><el-icon><Briefcase /></el-icon></div>
+          <div class="stat-body">
+            <span class="stat-label">今日活跃</span>
+            <strong class="stat-value">{{ portal?.todayActiveUsers ?? 0 }}</strong>
+            <span class="stat-hint">活跃率 {{ portal?.todayActiveRate ?? 0 }}%</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon icon-amber"><el-icon><Key /></el-icon></div>
+          <div class="stat-body">
+            <span class="stat-label">近 7 日活跃</span>
+            <strong class="stat-value">{{ portal?.sevenDayActiveUsers ?? 0 }}</strong>
+            <span class="stat-hint">禁用 {{ portal?.disabledUsers ?? 0 }} · 黑名单 {{ portal?.blacklistedUsers ?? 0 }}</span>
+          </div>
+        </div>
+      </section>
+    </template>
 
     <section class="bottom-grid">
       <div class="panel">
@@ -385,10 +431,22 @@ onMounted(loadData)
   transform: translate(-50%, -50%) rotate(-8deg);
 }
 
+.section-label {
+  margin: 2px 0 -4px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+
+.portal-stat-grid .stat-card {
+  background: linear-gradient(150deg, #ffffff, #f7fbff);
 }
 
 .stat-card {
@@ -430,6 +488,11 @@ onMounted(loadData)
 .icon-cyan {
   color: #0891b2;
   background: #eafaff;
+}
+
+.icon-green {
+  color: #159c73;
+  background: #e9faf3;
 }
 
 .stat-body {

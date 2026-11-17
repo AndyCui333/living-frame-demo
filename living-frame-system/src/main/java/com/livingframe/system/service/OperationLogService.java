@@ -26,12 +26,13 @@ public class OperationLogService {
 
     private final SysOperationLogMapper operationLogMapper;
 
-    public void record(Long userId, String username, String operation, String method,
+    public void record(Long userId, String username, String userType, String operation, String method,
                        String requestUri, String ip, String status, String errorMessage, long durationMs) {
         try {
             operationLogMapper.insert(new SysOperationLog()
                     .setUserId(userId)
                     .setUsername(username)
+                    .setUserType(userType)
                     .setOperation(operation)
                     .setMethod(method)
                     .setRequestUri(requestUri)
@@ -57,6 +58,15 @@ public class OperationLogService {
         if (StrUtil.isNotBlank(query.getStatus())) {
             wrapper.eq(SysOperationLog::getStatus, query.getStatus().trim().toUpperCase());
         }
+        if (StrUtil.isNotBlank(query.getUserType())) {
+            String userType = query.getUserType().trim().toUpperCase();
+            if ("ADMIN".equals(userType)) {
+                wrapper.and(w -> w.eq(SysOperationLog::getUserType, "ADMIN")
+                        .or().isNull(SysOperationLog::getUserType));
+            } else {
+                wrapper.eq(SysOperationLog::getUserType, userType);
+            }
+        }
         wrapper.orderByDesc(SysOperationLog::getId);
         Page<SysOperationLog> page = operationLogMapper.selectPage(
                 new Page<>(query.getPageNum(), query.getPageSize()), wrapper);
@@ -69,6 +79,7 @@ public class OperationLogService {
                 log.getId(),
                 log.getUserId(),
                 log.getUsername(),
+                log.getUserType(),
                 log.getOperation(),
                 log.getMethod(),
                 log.getRequestUri(),

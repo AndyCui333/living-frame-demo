@@ -274,9 +274,6 @@ onUnmounted(stopCountdown)
                 </template>
                 <template v-else>验证码已失效，正在自动刷新…</template>
               </span>
-              <button type="button" class="captcha-refresh-link" :disabled="captchaLoading" @click="loadCaptcha()">
-                立即刷新
-              </button>
             </div>
           </el-form-item>
           <el-form-item v-else label="验证码">
@@ -547,25 +544,6 @@ onUnmounted(stopCountdown)
 .captcha-countdown.is-expiring,
 .captcha-countdown.is-expiring strong {
   color: #d97706;
-}
-
-.captcha-refresh-link {
-  padding: 0;
-  border: none;
-  color: #5b73ff;
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.captcha-refresh-link:disabled {
-  color: #b8c0d4;
-  cursor: wait;
-}
-
-.captcha-refresh-link:hover:not(:disabled) {
-  color: #3d55e8;
-  text-decoration: underline;
 }
 
 .login-button {

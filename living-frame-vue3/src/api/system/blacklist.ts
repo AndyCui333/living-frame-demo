@@ -15,6 +15,7 @@ interface RawBlacklist extends Omit<BlacklistRecord, 'id'> {
 export interface BlacklistQuery extends PageQuery {
   targetType?: string
   targetValue?: string
+  userScope?: string
   status?: number
 }
 

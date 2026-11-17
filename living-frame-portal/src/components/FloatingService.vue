@@ -1,11 +1,13 @@
-<script setup>
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+<script setup lang="ts">
+import { nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { openChat } from '../chatState'
 
-const SIZE = 58
+const SIZE = 48
 const MARGIN = 14
-const BOTTOM_SPACE = 86
+const BOTTOM_SPACE = 78
 const STORAGE_KEY = 'living-frame-portal-service-position'
+const route = useRoute()
 
 const buttonRef = ref(null)
 const position = reactive({ x: 0, y: 0 })
@@ -19,11 +21,21 @@ let originY = 0
 function bounds() {
   const shell = document.querySelector('.portal-shell')
   const rect = shell ? shell.getBoundingClientRect() : { left: 0, right: window.innerWidth, top: 0 }
+  let maxY = window.innerHeight - BOTTOM_SPACE - SIZE
+  if (route.name === 'me') {
+    const actions = document.querySelector('.account-actions')
+    if (actions) {
+      const actionsRect = actions.getBoundingClientRect()
+      if (actionsRect.height > 0) {
+        maxY = Math.min(maxY, actionsRect.top - SIZE - 12)
+      }
+    }
+  }
   return {
     minX: rect.left + MARGIN,
     maxX: rect.right - SIZE - MARGIN,
     minY: Math.max(rect.top + MARGIN, 12),
-    maxY: window.innerHeight - BOTTOM_SPACE - SIZE,
+    maxY: Math.max(Math.max(rect.top + MARGIN, 12), maxY),
   }
 }
 
@@ -81,6 +93,11 @@ function onPointerUp() {
   dragging.value = false
   window.removeEventListener('pointermove', onPointerMove)
   if (moved.value) {
+    const limit = bounds()
+    const distanceToLeft = position.x - limit.minX
+    const distanceToRight = limit.maxX - position.x
+    position.x = distanceToLeft <= distanceToRight ? limit.minX : limit.maxX
+    clampPosition()
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: position.x, y: position.y }))
     return
   }
@@ -91,13 +108,29 @@ function onResize() {
   clampPosition()
 }
 
+function onViewportChange() {
+  clampPosition()
+}
+
 onMounted(() => {
   restorePosition()
   window.addEventListener('resize', onResize)
+  window.addEventListener('scroll', onViewportChange, { passive: true })
 })
+
+watch(
+  () => route.name,
+  async () => {
+    await nextTick()
+    resetToDefault()
+    clampPosition()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: position.x, y: position.y }))
+  },
+)
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('scroll', onViewportChange)
   window.removeEventListener('pointermove', onPointerMove)
 })
 </script>
@@ -119,7 +152,6 @@ onUnmounted(() => {
       <rect x="16.3" y="13" width="4.2" height="6.2" rx="2.1" />
       <path d="M18.4 19.2c-.6 1.6-2 2.8-4.4 2.8" />
     </svg>
-    <span class="service-dot"></span>
   </button>
 </template>
 
@@ -129,17 +161,17 @@ onUnmounted(() => {
   z-index: 40;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   color: #ffffff;
   background: linear-gradient(145deg, #5b75ff, #7658ff);
-  box-shadow: 0 12px 28px rgba(79, 107, 251, 0.38);
+  box-shadow: 0 10px 22px rgba(79, 107, 251, 0.32);
   cursor: grab;
   touch-action: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: left 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .service-fab.dragging {
@@ -151,8 +183,8 @@ onUnmounted(() => {
 .service-fab svg {
   position: relative;
   z-index: 2;
-  width: 28px;
-  height: 28px;
+  width: 23px;
+  height: 23px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -162,23 +194,11 @@ onUnmounted(() => {
 
 .service-halo {
   position: absolute;
-  inset: -7px;
+  inset: -5px;
   border: 1px solid rgba(79, 107, 251, 0.18);
   border-radius: 50%;
   background: rgba(79, 107, 251, 0.08);
   animation: halo 2.8s ease-out infinite;
-}
-
-.service-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 3;
-  width: 9px;
-  height: 9px;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  background: #34d399;
 }
 
 @keyframes halo {

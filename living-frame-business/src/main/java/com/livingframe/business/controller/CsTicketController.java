@@ -48,6 +48,20 @@ public class CsTicketController {
         return R.ok(ticketService.agentReply(currentUserId(), id, request.content()));
     }
 
+    @PostMapping("/{id}/read")
+    @PreAuthorize("@ss.hasAnyPermi('cs:chat:list','cs:ticket:list')")
+    public R<Void> markRead(@PathVariable Long id) {
+        ticketService.markRead(currentUserId(), id);
+        return R.ok();
+    }
+
+    @PostMapping("/{id}/leave")
+    @PreAuthorize("@ss.hasAnyPermi('cs:chat:list','cs:ticket:list')")
+    public R<Void> leave() {
+        ticketService.leaveAgentTicket(currentUserId());
+        return R.ok();
+    }
+
     @PostMapping("/{id}/dispatch")
     @OperationLog("派遣客服工单")
     @PreAuthorize("@ss.hasPermi('cs:ticket:dispatch')")
@@ -65,10 +79,10 @@ public class CsTicketController {
     }
 
     @PostMapping("/{id}/archive")
-    @OperationLog("截单归档客服工单")
+    @OperationLog("申请完结客服工单")
     @PreAuthorize("@ss.hasPermi('cs:ticket:close')")
     public R<Void> archive(@PathVariable Long id) {
-        ticketService.archive(currentUserId(), id);
+        ticketService.requestComplete(currentUserId(), id);
         return R.ok();
     }
 

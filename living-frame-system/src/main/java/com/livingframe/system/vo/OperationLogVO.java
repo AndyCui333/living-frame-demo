@@ -4,6 +4,7 @@ public record OperationLogVO(
         Long id,
         Long userId,
         String username,
+        String userType,
         String operation,
         String method,
         String requestUri,

@@ -6,6 +6,8 @@ public record CsAgentView(
         String name,
         String serviceType,
         String onlineStatus,
-        Long currentTicketId
+        Long currentTicketId,
+        int activeCount,
+        int capacity
 ) {
 }

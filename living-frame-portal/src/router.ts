@@ -22,6 +22,21 @@ const router = createRouter({
       component: () => import('./views/MyView.vue'),
       meta: { tab: true },
     },
+    {
+      path: '/me/profile',
+      name: 'profile',
+      component: () => import('./views/ProfileView.vue'),
+    },
+    {
+      path: '/me/password',
+      name: 'password',
+      component: () => import('./views/PasswordView.vue'),
+    },
+    {
+      path: '/notifications',
+      name: 'notifications',
+      component: () => import('./views/NotificationView.vue'),
+    },
   ],
 })
 

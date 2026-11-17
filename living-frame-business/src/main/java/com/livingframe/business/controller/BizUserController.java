@@ -4,6 +4,8 @@ import com.livingframe.business.dto.BizUserCreateRequest;
 import com.livingframe.business.dto.BizUserQuery;
 import com.livingframe.business.dto.BizUserUpdateRequest;
 import com.livingframe.business.service.BizUserService;
+import com.livingframe.business.vo.BizUserActivityVO;
+import com.livingframe.business.vo.BizUserStatisticsVO;
 import com.livingframe.business.vo.BizUserVO;
 import com.livingframe.common.annotation.OperationLog;
 import com.livingframe.common.api.PageResult;
@@ -33,6 +35,18 @@ public class BizUserController {
     @PreAuthorize("@ss.hasPermi('business:user:list')")
     public R<PageResult<BizUserVO>> page(BizUserQuery query) {
         return R.ok(bizUserService.page(query));
+    }
+
+    @GetMapping("/activity")
+    @PreAuthorize("@ss.hasPermi('business:user:list')")
+    public R<BizUserActivityVO> activity() {
+        return R.ok(bizUserService.activity());
+    }
+
+    @GetMapping("/statistics")
+    @PreAuthorize("@ss.hasPermi('business:statistics:list')")
+    public R<BizUserStatisticsVO> statistics() {
+        return R.ok(bizUserService.statistics());
     }
 
     @GetMapping("/{id}")
@@ -77,6 +91,14 @@ public class BizUserController {
     @PreAuthorize("@ss.hasPermi('business:user:update')")
     public R<Void> resetPassword(@PathVariable Long id, @Valid @RequestBody ResetPasswordRequest request) {
         bizUserService.resetPassword(id, request.password());
+        return R.ok();
+    }
+
+    @PostMapping("/{id}/blacklist")
+    @OperationLog("门户用户一键拉黑")
+    @PreAuthorize("@ss.hasPermi('business:user:update')")
+    public R<Void> blacklist(@PathVariable Long id) {
+        bizUserService.blacklist(id);
         return R.ok();
     }
 }

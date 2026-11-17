@@ -47,6 +47,8 @@ public class OperationLogAspect {
                 operationLogService.record(
                         loginUser == null ? null : loginUser.getId(),
                         loginUser == null ? "anonymous" : loginUser.getUsername(),
+                        loginUser == null || loginUser.getUserType() == null
+                                ? "ADMIN" : loginUser.getUserType().name(),
                         operationLog.value(),
                         request == null ? null : request.getMethod(),
                         request == null ? null : request.getRequestURI(),

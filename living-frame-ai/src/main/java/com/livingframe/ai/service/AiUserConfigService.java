@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -199,7 +200,7 @@ public class AiUserConfigService {
                 config.getReasoningLevel(),
                 config.getTemperature(),
                 config.getMaxTokens(),
-                config.getBaseUrl(),
+                normalizeBaseUrl(config.getBaseUrl()),
                 apiKey,
                 true);
     }
@@ -242,10 +243,17 @@ public class AiUserConfigService {
 
     private String normalizeBaseUrl(String baseUrl) {
         String normalized = baseUrl.trim().replaceAll("/+$", "");
-        if (normalized.endsWith("/v1")) {
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        // OpenAI 兼容客户端会自动拼接 /v1/chat/completions。
+        // 用户如果把完整请求地址填进来，需要退回到根地址，否则会请求两次 /v1/chat/completions。
+        if (lower.endsWith("/v1/chat/completions")) {
+            normalized = normalized.substring(0, normalized.length() - "/v1/chat/completions".length());
+        } else if (lower.endsWith("/chat/completions")) {
+            normalized = normalized.substring(0, normalized.length() - "/chat/completions".length());
+        } else if (lower.endsWith("/v1")) {
             normalized = normalized.substring(0, normalized.length() - 3);
         }
-        return normalized;
+        return normalized.replaceAll("/+$", "");
     }
 
     private AiUserConfigView toView(SysUserAiConfig config) {
@@ -253,7 +261,7 @@ public class AiUserConfigService {
                 config.getId(),
                 config.getProvider(),
                 config.getProviderName(),
-                config.getBaseUrl(),
+                normalizeBaseUrl(config.getBaseUrl()),
                 config.getModel(),
                 keyCipher.hasKey(config.getApiKeyEncrypted()),
                 Integer.valueOf(1).equals(config.getIsDefault()),

@@ -68,6 +68,16 @@ public class AiChatService {
                 throw new BusinessException(400,
                         "模型 " + config.model() + " 不存在或当前账号无权访问，请到「AI 设置」选择可用模型");
             }
+            if (isRateLimited(ex)) {
+                log.warn("AI 服务触发限流: provider={}, model={}", config.provider(), config.model());
+                throw new BusinessException(429,
+                        "AI 服务请求过于频繁或当前模型额度不足，请稍后重试或切换其他模型");
+            }
+            if (isUnauthorized(ex)) {
+                log.warn("AI 服务认证失败: provider={}, model={}", config.provider(), config.model());
+                throw new BusinessException(401,
+                        "AI 服务认证失败，请到「AI 设置」检查 API Key 是否有效");
+            }
             log.error("调用 AI 对话失败: provider={}, model={}", config.provider(), config.model(), ex);
             throw new BusinessException(ResultCode.AI_UNAVAILABLE, "AI 服务暂时不可用，请检查模型配置或稍后重试");
         }
@@ -111,6 +121,34 @@ public class AiChatService {
             if (message != null && (message.contains("Model not exist")
                     || message.contains("model_not_found")
                     || message.contains("does not exist"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isRateLimited(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && (message.contains("429")
+                    || message.contains("Rate Limit")
+                    || message.contains("rate_limit"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isUnauthorized(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && (message.contains("401")
+                    || message.contains("Unauthorized")
+                    || message.contains("invalid_api_key"))) {
                 return true;
             }
             current = current.getCause();

@@ -13,7 +13,7 @@ public class AiMemoryProperties {
     /**
      * Qdrant 的 HTTP REST 端口（默认 6333；当前环境的 HTTP 端口为 6033）。
      */
-    private String qdrantUrl = "http://localhost:6333";
+    private String qdrantUrl = "http://192.168.28.212:6033";
     private String collection = "living-frame-ai-memory";
     private int vectorSize = 384;
     private int topK = 5;

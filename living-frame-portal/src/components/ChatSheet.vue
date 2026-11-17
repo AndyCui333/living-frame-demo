@@ -1,7 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { portalApi } from '../api'
 import { chatState } from '../chatState'
+import { loadDrafts, removeDraft, saveDraft } from '../drafts'
+import { session } from '../session'
 
 const type = ref('CHAT')
 const tickets = ref([])
@@ -15,11 +18,15 @@ const messagesEl = ref(null)
 const feedbackRating = ref(0)
 const feedbackText = ref('')
 const feedbackSending = ref(false)
+const drafts = ref([])
+const activeDraftId = ref('')
 let polling = null
 
 const isOpen = computed(() => chatState.open)
 const title = computed(() => (type.value === 'TECH' ? '技术客服' : '在线客服'))
+const displayTitle = computed(() => (historyVisible.value ? '我的工单' : title.value))
 const statusText = computed(() => {
+  if (historyVisible.value) return '查看全部工单记录'
   if (!current.value) return '新建对话'
   return statusLabels[current.value.status] || current.value.status
 })
@@ -30,7 +37,8 @@ const statusLabels = {
   PENDING: '等待接单',
   ASSIGNED: '已接单',
   PROCESSING: '沟通中',
-  ARCHIVED: '已归档',
+  WAIT_CONFIRM: '待确认完结',
+  ARCHIVED: '已结束',
 }
 
 const typeLabels = {
@@ -50,14 +58,8 @@ function formatTime(value) {
   }).format(date)
 }
 
-function isRecent(ticket) {
-  if (!ticket.lastMessageAt) return false
-  const time = new Date(ticket.lastMessageAt.replace(' ', 'T')).getTime()
-  return Number.isFinite(time) && Date.now() - time < 2 * 60 * 1000
-}
-
-function isInProgress(ticket) {
-  return ticket.status === 'ASSIGNED' || ticket.status === 'PROCESSING'
+function isUnfinished(ticket) {
+  return ticket.status !== 'ARCHIVED' && ticket.status !== 'DRAFT'
 }
 
 async function scrollToBottom() {
@@ -79,6 +81,8 @@ async function loadDetail(ticketId) {
   messages.value = detail.messages
   feedbackRating.value = detail.ticket.rating || 0
   feedbackText.value = detail.ticket.feedback || ''
+  await portalApi.markTicketRead(ticketId).catch(() => undefined)
+  window.dispatchEvent(new Event('notifications-updated'))
   await scrollToBottom()
 }
 
@@ -88,12 +92,18 @@ async function boot() {
   type.value = chatState.initialType || 'CHAT'
   current.value = null
   messages.value = []
+  drafts.value = loadDrafts(session.user?.id)
+  activeDraftId.value = ''
   try {
     const list = await loadTickets()
-    if (!historyVisible.value) {
+    const targetTicketId = chatState.targetTicketId
+    chatState.targetTicketId = null
+    if (!historyVisible.value && targetTicketId) {
+      await loadDetail(targetTicketId)
+    } else if (!historyVisible.value) {
       const active = list
-        .filter((ticket) => ticket.ticketType === type.value && isInProgress(ticket) && isRecent(ticket))
-        .sort((a, b) => String(b.lastMessageAt).localeCompare(String(a.lastMessageAt)))[0]
+        .filter((ticket) => isUnfinished(ticket))
+        .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0]
       if (active) {
         await loadDetail(active.id)
       }
@@ -108,7 +118,7 @@ function startPolling() {
   stopPolling()
   polling = setInterval(async () => {
     if (!chatState.open || historyVisible.value || !current.value || sending.value) return
-    if (!['PENDING', 'ASSIGNED', 'PROCESSING'].includes(current.value.status)) return
+    if (!['PENDING', 'ASSIGNED', 'PROCESSING', 'WAIT_CONFIRM'].includes(current.value.status)) return
     try {
       await loadDetail(current.value.id)
     } catch {
@@ -125,8 +135,12 @@ function stopPolling() {
 }
 
 function close() {
+  const ticketId = current.value?.id
   chatState.open = false
   stopPolling()
+  if (ticketId) {
+    void portalApi.leaveTicket(ticketId).catch(() => undefined)
+  }
 }
 
 function chooseType(nextType) {
@@ -137,6 +151,55 @@ function chooseType(nextType) {
   historyVisible.value = false
   feedbackRating.value = 0
   feedbackText.value = ''
+}
+
+function newConversation() {
+  type.value = 'CHAT'
+  current.value = null
+  messages.value = []
+  input.value = ''
+  activeDraftId.value = ''
+  feedbackRating.value = 0
+  feedbackText.value = ''
+}
+
+function saveCurrentDraft(showMessage = true) {
+  const content = input.value.trim()
+  if (!content) {
+    if (showMessage) ElMessage.warning('请先输入内容再保存草稿')
+    return
+  }
+  try {
+    const draft = saveDraft(session.user?.id, {
+      id: activeDraftId.value || undefined,
+      title: content.slice(0, 36),
+      content,
+      ticketType: type.value,
+    })
+    activeDraftId.value = draft.id
+    drafts.value = loadDrafts(session.user?.id)
+    if (showMessage) ElMessage.success('草稿已保存到当前登录会话')
+  } catch (error: any) {
+    ElMessage.error(error.message || '草稿保存失败')
+  }
+}
+
+function useDraft(draft) {
+  input.value = draft.content
+  type.value = draft.ticketType === 'TECH' ? 'TECH' : 'CHAT'
+  current.value = null
+  messages.value = []
+  activeDraftId.value = draft.id
+  historyVisible.value = false
+  feedbackRating.value = 0
+  feedbackText.value = ''
+}
+
+function deleteDraft(draft) {
+  drafts.value = removeDraft(session.user?.id, draft.id)
+  if (activeDraftId.value === draft.id) {
+    activeDraftId.value = ''
+  }
 }
 
 async function openHistory() {
@@ -173,10 +236,14 @@ async function send() {
     type.value = detail.ticket.ticketType
     messages.value = detail.messages
     input.value = ''
+    if (activeDraftId.value) {
+      drafts.value = removeDraft(session.user?.id, activeDraftId.value)
+      activeDraftId.value = ''
+    }
     await loadTickets()
     await scrollToBottom()
-  } catch (error) {
-    window.alert(error.message || '发送失败')
+  } catch (error: any) {
+    ElMessage.error(error.message || '发送失败')
   } finally {
     sending.value = false
   }
@@ -198,10 +265,41 @@ async function submitFeedback() {
       feedback: feedbackText.value.trim(),
     })
     current.value = { ...current.value, rating: feedbackRating.value, feedback: feedbackText.value.trim() }
-  } catch (error) {
-    window.alert(error.message || '评价失败')
+  } catch (error: any) {
+    ElMessage.error(error.message || '评价失败')
   } finally {
     feedbackSending.value = false
+  }
+}
+
+async function confirmCompletion() {
+  if (!current.value) return
+  try {
+    await ElMessageBox.confirm('确认服务已经完成？确认后本次工单将结束，并进入评价。', '确认完结', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  try {
+    await portalApi.confirmComplete(current.value.id)
+    await loadDetail(current.value.id)
+    await loadTickets()
+  } catch (error: any) {
+    ElMessage.error(error.message || '确认完结失败')
+  }
+}
+
+async function rejectCompletion() {
+  if (!current.value) return
+  try {
+    await portalApi.rejectComplete(current.value.id)
+    await loadDetail(current.value.id)
+    await loadTickets()
+  } catch (error: any) {
+    ElMessage.error(error.message || '操作失败')
   }
 }
 
@@ -214,7 +312,22 @@ watch(
   },
 )
 
-onUnmounted(stopPolling)
+watch(
+  () => chatState.open,
+  (open, wasOpen) => {
+    if (wasOpen && !open && input.value.trim()) {
+      saveCurrentDraft(false)
+    }
+  },
+)
+
+onUnmounted(() => {
+  stopPolling()
+  const ticketId = current.value?.id
+  if (ticketId) {
+    void portalApi.leaveTicket(ticketId).catch(() => undefined)
+  }
+})
 </script>
 
 <template>
@@ -227,11 +340,21 @@ onUnmounted(stopPolling)
               <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button>
             <div class="chat-heading">
-              <strong>{{ title }}</strong>
+              <strong>{{ displayTitle }}</strong>
               <span>{{ statusText }}</span>
             </div>
-            <button type="button" class="chat-icon" aria-label="历史工单" @click="openHistory">
-              <svg viewBox="0 0 24 24">
+            <button
+              type="button"
+              class="chat-icon"
+              :aria-label="historyVisible ? '返回对话' : '我的工单'"
+              :title="historyVisible ? '返回对话' : '我的工单'"
+              @click="historyVisible ? (historyVisible = false) : openHistory()"
+            >
+              <svg v-if="historyVisible" viewBox="0 0 24 24">
+                <path d="M20 11.5a7 7 0 0 1-10.2 6.2L4 19l1.3-5.8A7 7 0 1 1 20 11.5Z" />
+                <path d="M8.5 8.7h7M8.5 11.7h5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24">
                 <path d="M4 12a8 8 0 1 0 2.4-5.7" />
                 <path d="M4 5v4.5h4.5" />
                 <path d="M12 8v4l3 2" />
@@ -240,12 +363,18 @@ onUnmounted(stopPolling)
           </header>
 
           <div v-if="historyVisible" class="history-panel">
-            <div class="history-heading">
-              <div>
-                <strong>历史工单</strong>
-                <span>下拉或点击查看历史对话</span>
+            <div v-if="drafts.length" class="draft-section">
+              <div class="draft-heading">
+                <strong>草稿箱</strong>
+                <span>仅保存在当前登录浏览器，退出登录后清除</span>
               </div>
-              <button type="button" class="text-button" @click="historyVisible = false">返回对话</button>
+              <div v-for="draft in drafts" :key="draft.id" class="draft-card">
+                <button type="button" class="draft-main" @click="useDraft(draft)">
+                  <strong>{{ draft.title }}</strong>
+                  <span>{{ draft.content }}</span>
+                </button>
+                <button type="button" class="draft-delete" aria-label="删除草稿" @click="deleteDraft(draft)">×</button>
+              </div>
             </div>
             <div v-if="loading" class="loading-line">加载中...</div>
             <button
@@ -280,11 +409,8 @@ onUnmounted(stopPolling)
                   </svg>
                 </div>
                 <h2>你好，我是 Living Frame 客服</h2>
-                <p>发送你的问题，我们会为你创建工单并安排客服。</p>
-                <div class="type-switch">
-                  <button type="button" :class="{ active: type === 'CHAT' }" @click="chooseType('CHAT')">在线客服</button>
-                  <button type="button" :class="{ active: type === 'TECH' }" @click="chooseType('TECH')">技术客服</button>
-                </div>
+                <p>发送你的问题，我们会为你创建工单并安排在线客服。</p>
+                <div class="type-static">在线客服</div>
                 <div class="suggestions">
                   <button type="button" @click="input = '如何修改登录密码？'">如何修改登录密码？</button>
                   <button type="button" @click="input = '我想了解工单处理进度'">我想了解工单处理进度</button>
@@ -304,6 +430,15 @@ onUnmounted(stopPolling)
                 <div class="bubble">{{ message.content }}</div>
               </div>
 
+              <div v-if="current?.status === 'WAIT_CONFIRM'" class="complete-card">
+                <strong>客服申请结束本次服务</strong>
+                <span>确认后工单才会结束并进入评价；如果还需要继续沟通，请选择“继续处理”。</span>
+                <div class="complete-actions">
+                  <button type="button" class="primary-button" @click="confirmCompletion">确认完成</button>
+                  <button type="button" class="ghost-button" @click="rejectCompletion">继续处理</button>
+                </div>
+              </div>
+
               <div v-if="canRate" class="rating-card">
                 <strong>本次服务怎么样？</strong>
                 <span>你的评价会帮助我们做得更好</span>
@@ -316,35 +451,59 @@ onUnmounted(stopPolling)
                     @click="feedbackRating = star"
                   >★</button>
                 </div>
-                <textarea v-model="feedbackText" rows="2" maxlength="1000" placeholder="补充评价（可选）"></textarea>
-                <button type="button" class="primary-button" :disabled="!feedbackRating || feedbackSending" @click="submitFeedback">
+                <el-input
+                  v-model="feedbackText"
+                  type="textarea"
+                  :rows="2"
+                  maxlength="1000"
+                  placeholder="补充评价（可选）"
+                  class="feedback-input"
+                />
+                <el-button type="primary" class="primary-button" :loading="feedbackSending" :disabled="!feedbackRating" @click="submitFeedback">
                   提交评价
-                </button>
+                </el-button>
               </div>
               <div v-else-if="current?.status === 'ARCHIVED' && current?.rating" class="rated-tip">
                 已评价 {{ current.rating }} 分，感谢你的反馈 🌿
               </div>
             </div>
 
-            <footer class="composer">
+            <footer v-if="current?.status !== 'ARCHIVED'" class="composer">
               <div class="composer-top">
                 <span class="service-type-label">{{ typeLabels[type] }}</span>
                 <span v-if="current" class="ticket-label">{{ current.ticketNo }}</span>
                 <span v-else class="ticket-label">发送消息后创建工单</span>
+                <el-button link type="primary" class="save-draft-button" @click="saveCurrentDraft()">存草稿</el-button>
               </div>
               <div class="composer-row">
-                <textarea
+                <el-input
                   v-model="input"
-                  rows="1"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
                   maxlength="5000"
                   placeholder="输入你想咨询的问题..."
+                  class="chat-composer-input"
                   @keydown="onKeydown"
-                ></textarea>
-                <button type="button" class="send-button" :disabled="!input.trim() || sending" @click="send">
-                  <svg viewBox="0 0 24 24"><path d="m4 4 17 8-17 8 3.2-8L4 4Z" /><path d="M7.2 12H21" /></svg>
-                </button>
+                />
+                <el-button
+                  type="primary"
+                  class="send-button"
+                  :loading="sending"
+                  :disabled="!input.trim()"
+                  aria-label="发送消息"
+                  @click="send"
+                >
+                  <svg v-if="!sending" viewBox="0 0 24 24"><path d="m4 4 17 8-17 8 3.2-8L4 4Z" /><path d="M7.2 12H21" /></svg>
+                </el-button>
               </div>
-              <span class="composer-hint">超过 2 分钟未继续且工单未在进行中，将自动开启新工单</span>
+              <span class="composer-hint">工单未结束前不会创建新工单；结束后再次咨询会开启新工单</span>
+            </footer>
+            <footer v-else class="ended-footer">
+              <div>
+                <strong>该工单已结束</strong>
+                <span>继续咨询需要发起一个新工单</span>
+              </div>
+              <button type="button" class="primary-button" @click="newConversation">发起新工单</button>
             </footer>
           </div>
         </section>
@@ -482,31 +641,13 @@ onUnmounted(stopPolling)
   line-height: 1.7;
 }
 
-.type-switch {
-  display: flex;
-  gap: 5px;
-  margin-top: 18px;
-  padding: 4px;
-  border-radius: 12px;
-  background: #eef2f8;
-}
-
-.type-switch button {
-  height: 31px;
-  padding: 0 14px;
-  border: 0;
+.type-static {
+  margin-top: 14px;
+  padding: 5px 12px;
   border-radius: 9px;
-  color: #8792a5;
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.type-switch button.active {
   color: #4f6bfb;
-  background: #ffffff;
-  box-shadow: 0 3px 10px rgba(58, 80, 130, 0.1);
-  font-weight: 650;
+  background: #eef2ff;
+  font-size: 10px;
 }
 
 .suggestions {
@@ -587,6 +728,41 @@ onUnmounted(stopPolling)
   background: #fbfaff;
 }
 
+.complete-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 16px;
+  padding: 14px;
+  border: 1px solid #f0dfb8;
+  border-radius: 15px;
+  background: #fffbf0;
+}
+
+.complete-card strong {
+  color: #72552a;
+  font-size: 12px;
+}
+
+.complete-card span {
+  color: #9b8868;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.complete-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.complete-card .primary-button,
+.complete-card .ghost-button {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 10px;
+}
+
 .rating-card strong {
   color: #3f356d;
   font-size: 12px;
@@ -616,16 +792,52 @@ onUnmounted(stopPolling)
   color: #f4b740;
 }
 
-.rating-card textarea {
-  width: 100%;
+.feedback-input :deep(.el-textarea__inner) {
   padding: 9px 11px;
   border: 1px solid #e9e4f5;
   border-radius: 10px;
   color: #4b435f;
   background: #ffffff;
-  outline: none;
+  box-shadow: none;
   resize: none;
   font-size: 11px;
+}
+
+.composer-row .chat-composer-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-row .chat-composer-input :deep(.el-textarea__inner) {
+  min-height: 42px !important;
+  max-height: 96px;
+  padding: 11px 13px;
+  border: 1px solid #e7ecf4;
+  border-radius: 14px;
+  color: #263042;
+  background: #f8fafe;
+  box-shadow: none;
+  resize: none;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.send-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f6bfb, #7658ff);
+  box-shadow: 0 7px 16px rgba(79, 107, 251, 0.25);
+}
+
+.send-button:disabled {
+  opacity: 0.42;
+  box-shadow: none;
 }
 
 .rating-card .primary-button {
@@ -667,7 +879,7 @@ onUnmounted(stopPolling)
 
 .ticket-label {
   overflow: hidden;
-  max-width: 65%;
+  max-width: 55%;
   color: #a0a9b8;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 9px;
@@ -675,44 +887,89 @@ onUnmounted(stopPolling)
   white-space: nowrap;
 }
 
+.save-draft-button {
+  margin-left: auto;
+  padding: 3px 0 3px 8px;
+  border: 0;
+  color: #4f6bfb;
+  background: transparent;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.draft-section {
+  margin-bottom: 16px;
+}
+
+.draft-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.draft-heading strong {
+  color: #3d4960;
+  font-size: 12px;
+}
+
+.draft-heading span {
+  color: #a0a9b8;
+  font-size: 9px;
+}
+
+.draft-card {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 7px;
+  border: 1px dashed #dce2ee;
+  border-radius: 12px;
+  background: #fbfcff;
+}
+
+.draft-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.draft-main strong {
+  overflow: hidden;
+  color: #3d4960;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-main span {
+  overflow: hidden;
+  color: #9aa3b5;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-delete {
+  width: 32px;
+  border: 0;
+  color: #b7bfcc;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+}
+
 .composer-row {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-}
-
-.composer-row textarea {
-  flex: 1;
-  min-height: 42px;
-  max-height: 96px;
-  padding: 11px 13px;
-  border: 1px solid #e7ecf4;
-  border-radius: 14px;
-  color: #263042;
-  background: #f8fafe;
-  outline: none;
-  resize: none;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.send-button {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  border: 0;
-  border-radius: 13px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #4f6bfb, #7658ff);
-  box-shadow: 0 7px 16px rgba(79, 107, 251, 0.25);
-  cursor: pointer;
-}
-
-.send-button:disabled {
-  opacity: 0.42;
-  box-shadow: none;
 }
 
 .send-button svg {
@@ -731,6 +988,38 @@ onUnmounted(stopPolling)
   color: #b1b8c4;
   font-size: 9px;
   text-align: center;
+}
+
+.ended-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--portal-line);
+  background: #ffffff;
+}
+
+.ended-footer > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ended-footer strong {
+  color: #4b5563;
+  font-size: 11px;
+}
+
+.ended-footer span {
+  color: #9aa3b5;
+  font-size: 9px;
+}
+
+.ended-footer .primary-button {
+  height: 36px;
+  padding: 0 13px;
+  font-size: 10px;
 }
 
 .history-panel {

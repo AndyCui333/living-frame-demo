@@ -12,6 +12,7 @@ public record CsTicketView(
         String portalUserName,
         Long assignedAgentId,
         String assignedAgentName,
+        boolean unread,
         Integer rating,
         String feedback,
         LocalDateTime assignedAt,

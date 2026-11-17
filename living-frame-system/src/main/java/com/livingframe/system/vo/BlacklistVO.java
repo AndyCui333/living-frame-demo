@@ -4,6 +4,7 @@ public record BlacklistVO(
         Long id,
         String targetType,
         String targetValue,
+        String userScope,
         String reason,
         Integer status,
         String createdBy

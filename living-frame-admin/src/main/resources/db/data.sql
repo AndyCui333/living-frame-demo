@@ -10,26 +10,34 @@ VALUES (1, 'SUPER_ADMIN', '超级管理员', '拥有系统全部权限', 1, 1, 0
 
 -- 菜单
 INSERT IGNORE INTO `sys_permission` (`id`, `code`, `name`, `type`, `parent_id`, `path`, `sort`, `status`, `deleted`)
-VALUES (100, 'system', '系统管理', 'MENU', 0, '/system', 1, 1, 0),
+VALUES (99, 'dashboard', '首页', 'MENU', 0, '/dashboard', 0, 1, 0),
+       (100, 'system', '系统管理', 'MENU', 0, '/system', 1, 1, 0),
        (101, 'system:user:list', '用户管理', 'MENU', 100, '/system/user', 1, 1, 0),
        (102, 'system:role:list', '角色管理', 'MENU', 100, '/system/role', 2, 1, 0),
        (103, 'system:permission:list', '权限管理', 'MENU', 100, '/system/permission', 3, 1, 0),
-       (104, 'system:login-log:list', '登录日志', 'MENU', 100, '/system/login-log', 4, 1, 0),
-       (105, 'system:operation-log:list', '操作日志', 'MENU', 100, '/system/operation-log', 5, 1, 0),
-       (106, 'system:blacklist:list', '系统黑名单', 'MENU', 100, '/system/blacklist', 6, 1, 0),
+       (104, 'system:login-log:list', '系统登录日志', 'MENU', 100, '/system/login-log', 4, 1, 0),
+       (105, 'system:operation-log:list', '系统操作日志', 'MENU', 100, '/system/operation-log', 5, 1, 0),
+       (106, 'system:blacklist:list', '系统黑名单', 'MENU', 0, '/system/blacklist', 5, 1, 0),
        (107, 'system:file:list', '文件管理', 'MENU', 100, '/system/file', 7, 1, 0),
        (110, 'business', '业务管理', 'MENU', 0, '/business', 2, 1, 0),
        (111, 'business:user:list', '业务用户', 'MENU', 110, '/business/user', 1, 1, 0),
+       (112, 'business:login-log:portal', '门户登录日志', 'MENU', 110, '/business/login-log', 2, 1, 0),
+       (113, 'business:operation-log:portal', '门户操作日志', 'MENU', 110, '/business/operation-log', 3, 1, 0),
+       (114, 'business:statistics:list', '用户统计', 'MENU', 110, '/business/statistics', 4, 1, 0),
        (120, 'ai', 'AI 能力', 'MENU', 0, '/ai', 3, 1, 0),
        (121, 'ai:chat', 'AI 对话', 'MENU', 120, '/ai/chat', 1, 1, 0),
        (122, 'ai:agent', 'AI Agent', 'MENU', 120, '/ai/agent', 2, 1, 0),
        (123, 'ai:config', 'AI 设置', 'MENU', 120, '/ai/settings', 3, 1, 0),
        (130, 'customer-service', '客服中心', 'MENU', 0, '/customer-service', 4, 1, 0),
        (131, 'cs:chat:list', '客服聊天', 'MENU', 130, '/customer-service/chat', 1, 1, 0),
-       (132, 'cs:ticket:list', '工单流程', 'MENU', 130, '/customer-service/ticket', 2, 1, 0);
+       (132, 'cs:ticket:list', '工单流程', 'MENU', 130, '/customer-service/ticket', 2, 1, 0),
+       (140, 'cs:ranking:list', '客服排行', 'MENU', 0, '/customer-service/ranking', 6, 1, 0);
 
--- 兼容旧库：将原黑名单菜单名更新为系统黑名单
-UPDATE `sys_permission` SET `name` = '系统黑名单' WHERE `id` = 106 AND `code` = 'system:blacklist:list';
+-- 兼容旧库：将原黑名单菜单移动到一级菜单
+UPDATE `sys_permission` SET `name` = '系统黑名单', `parent_id` = 0, `sort` = 5
+WHERE `id` = 106 AND `code` = 'system:blacklist:list';
+UPDATE `sys_permission` SET `name` = '系统登录日志' WHERE `id` = 104 AND `code` = 'system:login-log:list';
+UPDATE `sys_permission` SET `name` = '系统操作日志' WHERE `id` = 105 AND `code` = 'system:operation-log:list';
 
 -- 按钮权限
 INSERT IGNORE INTO `sys_permission` (`id`, `code`, `name`, `type`, `parent_id`, `path`, `sort`, `status`, `deleted`)
@@ -61,7 +69,8 @@ VALUES (200, 'system:user:create', '新增用户', 'BUTTON', 101, NULL, 1, 1, 0)
 
 -- 系统管理员：用户/日志/黑名单管理；不能访问角色、权限管理菜单
 INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
-VALUES (2, 100), (2, 101), (2, 104), (2, 105), (2, 106), (2, 107),
+VALUES (2, 99), (2, 100), (2, 101), (2, 104), (2, 105), (2, 106), (2, 107), (2, 140),
+       (2, 110), (2, 111), (2, 112), (2, 113), (2, 114),
        (2, 200), (2, 201), (2, 202), (2, 203), (2, 204),
        (2, 240), (2, 241), (2, 242), (2, 250), (2, 251), (2, 252);
 
@@ -74,22 +83,22 @@ WHERE r.code <> 'SUPER_ADMIN'
 
 -- 业务管理员：业务菜单 + 业务按钮 + AI 对话
 INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
-VALUES (3, 110), (3, 111), (3, 120), (3, 121),
+VALUES (3, 99), (3, 140), (3, 110), (3, 111), (3, 112), (3, 113), (3, 114), (3, 120), (3, 121),
        (3, 230), (3, 231), (3, 232);
 
 -- 只读用户：只读菜单
 INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
-VALUES (4, 100), (4, 101), (4, 110), (4, 111);
+VALUES (4, 99), (4, 140), (4, 100), (4, 101), (4, 110), (4, 111);
 
 -- 客服坐席：AI 对话 + 客服聊天 + 工单流程，只有这些默认菜单
 INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
-VALUES (6, 120), (6, 121), (6, 130), (6, 131), (6, 132),
+VALUES (6, 99), (6, 140), (6, 120), (6, 121), (6, 130), (6, 131), (6, 132),
        (6, 260), (6, 261), (6, 262), (6, 263),
-       (7, 120), (7, 121), (7, 130), (7, 131), (7, 132),
+       (7, 99), (7, 140), (7, 120), (7, 121), (7, 130), (7, 131), (7, 132),
        (7, 260), (7, 261), (7, 262), (7, 263);
 
 -- 系统黑名单测试账号：账号由 AccountInitializer 创建，这里预置永久黑名单记录
-INSERT IGNORE INTO `sys_blacklist` (`target_type`, `target_value`, `reason`, `status`, `created_by`)
-VALUES ('USERNAME', 'blacklist_test',
+INSERT IGNORE INTO `sys_blacklist` (`target_type`, `target_value`, `user_scope`, `reason`, `status`, `created_by`)
+VALUES ('USERNAME', 'blacklist_test', 'SYSTEM',
         '系统黑名单功能测试账号：用于验证永久黑名单登录拦截；该账号被永久禁止登录，请勿删除或禁用此记录',
         1, 'SYSTEM');

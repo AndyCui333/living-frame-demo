@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import SidebarMenu from './components/SidebarMenu.vue'
 import HeaderBar from './components/HeaderBar.vue'
+import CsOnlineWatcher from './components/CsOnlineWatcher.vue'
 
 const auth = useAuthStore()
 const collapsed = ref(localStorage.getItem('lf-sidebar-collapsed') === '1')
@@ -50,6 +51,7 @@ onMounted(() => {
 
     <div class="main-area">
       <HeaderBar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
+      <CsOnlineWatcher />
       <main class="content-area">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
