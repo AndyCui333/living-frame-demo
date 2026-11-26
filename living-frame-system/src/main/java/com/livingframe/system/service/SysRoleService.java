@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.livingframe.common.api.PageResult;
 import com.livingframe.common.api.ResultCode;
 import com.livingframe.common.constant.Constants;
+import com.livingframe.common.context.LoginUserContext;
 import com.livingframe.common.exception.BusinessException;
 import com.livingframe.system.dto.AssignPermissionsRequest;
 import com.livingframe.system.dto.RoleCreateRequest;
@@ -95,6 +96,7 @@ public class SysRoleService {
     @Transactional(rollbackFor = Exception.class)
     public void update(Long id, RoleUpdateRequest request) {
         SysRole role = requireRole(id);
+        ensureSuperAdminRoleManageable(role);
         if (Constants.ROLE_SUPER_ADMIN.equals(role.getCode())
                 && request.status() != null
                 && request.status() == Constants.STATUS_DISABLED) {
@@ -117,6 +119,7 @@ public class SysRoleService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysRole role = requireRole(id);
+        ensureSuperAdminRoleManageable(role);
         if (Constants.ROLE_SUPER_ADMIN.equals(role.getCode())) {
             throw new BusinessException("不能删除超级管理员角色");
         }
@@ -136,7 +139,8 @@ public class SysRoleService {
 
     @Transactional(rollbackFor = Exception.class)
     public void assignPermissions(Long roleId, AssignPermissionsRequest request) {
-        requireRole(roleId);
+        SysRole role = requireRole(roleId);
+        ensureSuperAdminRoleManageable(role);
         List<Long> permissionIds = request.permissionIds();
         List<Long> distinct = permissionIds == null
                 ? List.of()
@@ -175,6 +179,16 @@ public class SysRoleService {
             throw new BusinessException(ResultCode.NOT_FOUND, "角色不存在");
         }
         return role;
+    }
+
+    /**
+     * 系统管理员可以维护普通角色，但超级管理员角色只能由超级管理员自己操作。
+     */
+    private void ensureSuperAdminRoleManageable(SysRole role) {
+        if (Constants.ROLE_SUPER_ADMIN.equals(role.getCode())
+                && !LoginUserContext.require().isSuperAdmin()) {
+            throw new BusinessException(403, "只有超级管理员可以操作超级管理员角色");
+        }
     }
 
     private RoleVO toVO(SysRole role) {

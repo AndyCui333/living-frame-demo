@@ -41,6 +41,7 @@
         <redisson.version>3.52.0</redisson.version>
         <minio.version>8.5.17</minio.version>
         <easy-captcha.version>1.6.2</easy-captcha.version>
+        <poi.version>5.5.1</poi.version>
     </properties>
 
     <dependencyManagement>
@@ -128,6 +129,11 @@
                 <groupId>com.github.whvcse</groupId>
                 <artifactId>easy-captcha</artifactId>
                 <version>${easy-captcha.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -34,7 +34,7 @@ public class SysRoleController {
     private final SysRoleService roleService;
 
     @GetMapping
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:list')")
     public R<PageResult<RoleVO>> page(RoleQuery query) {
         return R.ok(roleService.page(query));
     }
@@ -56,27 +56,27 @@ public class SysRoleController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:list')")
     public R<List<RoleVO>> all() {
         return R.ok(roleService.listAll());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:list')")
     public R<RoleVO> get(@PathVariable Long id) {
         return R.ok(roleService.get(id));
     }
 
     @PostMapping
     @OperationLog("新增角色")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:create')")
     public R<Long> create(@Valid @RequestBody RoleCreateRequest request) {
         return R.ok(roleService.create(request));
     }
 
     @PutMapping("/{id}")
     @OperationLog("编辑角色")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:update')")
     public R<Void> update(@PathVariable Long id, @Valid @RequestBody RoleUpdateRequest request) {
         roleService.update(id, request);
         return R.ok();
@@ -84,21 +84,21 @@ public class SysRoleController {
 
     @DeleteMapping("/{id}")
     @OperationLog("删除角色")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:delete')")
     public R<Void> delete(@PathVariable Long id) {
         roleService.delete(id);
         return R.ok();
     }
 
     @GetMapping("/{id}/permissions")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:assign-permission')")
     public R<List<Long>> permissions(@PathVariable Long id) {
         return R.ok(roleService.getPermissionIds(id));
     }
 
     @PutMapping("/{id}/permissions")
     @OperationLog("分配角色权限")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:role:assign-permission')")
     public R<Void> assignPermissions(@PathVariable Long id,
                                      @Valid @RequestBody AssignPermissionsRequest request) {
         roleService.assignPermissions(id, request);

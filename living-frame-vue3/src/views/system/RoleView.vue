@@ -389,6 +389,13 @@ onMounted(() => {
         <span class="text-muted permission-tip">勾选菜单与按钮权限</span>
       </div>
       <div v-loading="permissionLoading" class="permission-tree">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          title="保存后该角色用户会被强制下线，需要重新登录才会刷新菜单；超级管理员始终拥有全部权限。"
+          class="permission-alert"
+        />
         <el-tree
           ref="treeRef"
           :data="permissionTree"
@@ -474,6 +481,16 @@ onMounted(() => {
   max-height: 420px;
   padding-top: 12px;
   overflow: auto;
+}
+
+.permission-alert {
+  margin-bottom: 12px;
+  border-radius: 10px;
+}
+
+.permission-alert :deep(.el-alert__title) {
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .permission-node {

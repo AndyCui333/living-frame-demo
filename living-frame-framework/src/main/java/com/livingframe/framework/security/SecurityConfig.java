@@ -37,12 +37,14 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/auth/captcha",
                                 "/api/auth/login",
                                 "/api/biz/auth/login",
+                                "/api/system/files/media",
                                 "/api/public/avatars/**",
                                 "/actuator/health",
                                 "/error").permitAll()

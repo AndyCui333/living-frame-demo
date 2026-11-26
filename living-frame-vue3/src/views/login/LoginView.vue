@@ -127,8 +127,8 @@ async function handleLogin() {
       captchaCode: form.captchaCode.trim(),
     })
     ElMessage.success('登录成功')
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
-    router.replace(redirect)
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : auth.firstMenuPath
+    router.replace(redirect || '/' )
   } catch {
     form.captchaCode = ''
     await loadCaptcha()

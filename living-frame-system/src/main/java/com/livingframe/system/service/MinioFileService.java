@@ -9,7 +9,6 @@ import com.livingframe.system.dto.FileConfigResponse;
 import com.livingframe.system.dto.MinioObjectVO;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
-import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -19,7 +18,6 @@ import io.minio.RemoveObjectArgs;
 import io.minio.Result;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
-import io.minio.http.Method;
 import io.minio.messages.Bucket;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
@@ -27,16 +25,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -46,9 +49,14 @@ public class MinioFileService {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Set<String> AVATAR_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String MEDIA_TOKEN_SEPARATOR = "\n";
 
     private final MinioClient minioClient;
     private final MinioProperties properties;
+
+    public record MediaObject(String bucket, String objectName, long size, String contentType) {
+    }
 
     public FileConfigResponse config() {
         return new FileConfigResponse(properties.getDefaultBucket());
@@ -226,18 +234,100 @@ public class MinioFileService {
         }
     }
 
+    /**
+     * 生成同源媒体代理地址，避免 HTTPS 页面直接加载 HTTP MinIO 地址导致 Mixed Content。
+     */
     public String downloadUrl(String bucketName, String objectName) {
         String bucket = resolveBucket(bucketName);
         String object = requireObjectName(objectName);
+        return "/api/system/files/media?token="
+                + URLEncoder.encode(createMediaToken(bucket, object), StandardCharsets.UTF_8);
+    }
+
+    public MediaObject resolveMedia(String token) {
+        String payload = verifyMediaToken(token);
+        String[] parts = payload.split(MEDIA_TOKEN_SEPARATOR, -1);
+        if (parts.length != 3) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        String bucket = normalizeBucket(parts[0]);
+        String object = requireObjectName(parts[1]);
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                    .method(Method.GET)
+            StatObjectResponse stat = minioClient.statObject(StatObjectArgs.builder()
                     .bucket(bucket)
                     .object(object)
-                    .expiry((int) properties.getPresignedExpirySeconds(), TimeUnit.SECONDS)
+                    .build());
+            String contentType = StrUtil.blankToDefault(stat.contentType(), "application/octet-stream");
+            return new MediaObject(bucket, object, stat.size(), contentType);
+        } catch (Exception ex) {
+            throw minioError("读取文件信息", ex);
+        }
+    }
+
+    public InputStream openMedia(MediaObject media, long offset, long length) {
+        try {
+            return minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(media.bucket())
+                    .object(media.objectName())
+                    .offset(offset)
+                    .length(length)
                     .build());
         } catch (Exception ex) {
-            throw minioError("生成下载地址", ex);
+            throw minioError("读取文件内容", ex);
+        }
+    }
+
+    private String createMediaToken(String bucket, String object) {
+        long expiresAt = System.currentTimeMillis() / 1000 + properties.getPresignedExpirySeconds();
+        String payload = bucket + MEDIA_TOKEN_SEPARATOR + object + MEDIA_TOKEN_SEPARATOR + expiresAt;
+        String encoded = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+        return encoded + "." + sign(encoded);
+    }
+
+    private String verifyMediaToken(String token) {
+        if (StrUtil.isBlank(token)) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        int dot = token.lastIndexOf('.');
+        if (dot <= 0 || dot == token.length() - 1) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        String encoded = token.substring(0, dot);
+        String signature = token.substring(dot + 1);
+        byte[] expected = sign(encoded).getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expected, signature.getBytes(StandardCharsets.UTF_8))) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        String payload;
+        try {
+            payload = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        String[] parts = payload.split(MEDIA_TOKEN_SEPARATOR, -1);
+        if (parts.length != 3) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        try {
+            long expiresAt = Long.parseLong(parts[2]);
+            if (expiresAt < System.currentTimeMillis() / 1000) {
+                throw new BusinessException(401, "文件访问链接已过期，请刷新页面后重试");
+            }
+        } catch (NumberFormatException ex) {
+            throw new BusinessException(401, "文件访问链接无效");
+        }
+        return payload;
+    }
+
+    private String sign(String value) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+            mac.init(new SecretKeySpec(properties.getSecretKey().getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+            return Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception ex) {
+            throw new BusinessException(500, "生成文件访问链接失败");
         }
     }
 

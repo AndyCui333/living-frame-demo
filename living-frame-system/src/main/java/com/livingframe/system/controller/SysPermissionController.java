@@ -28,21 +28,21 @@ public class SysPermissionController {
     private final SysPermissionService permissionService;
 
     @GetMapping("/tree")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:permission:list')")
     public R<List<PermissionVO>> tree() {
         return R.ok(permissionService.tree());
     }
 
     @PostMapping
     @OperationLog("新增权限")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:permission:create')")
     public R<Long> create(@Valid @RequestBody PermissionCreateRequest request) {
         return R.ok(permissionService.create(request));
     }
 
     @PutMapping("/{id}")
     @OperationLog("编辑权限")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:permission:update')")
     public R<Void> update(@PathVariable Long id, @Valid @RequestBody PermissionUpdateRequest request) {
         permissionService.update(id, request);
         return R.ok();
@@ -50,7 +50,7 @@ public class SysPermissionController {
 
     @DeleteMapping("/{id}")
     @OperationLog("删除权限")
-    @PreAuthorize("@ss.hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@ss.hasPermi('system:permission:delete')")
     public R<Void> delete(@PathVariable Long id) {
         permissionService.delete(id);
         return R.ok();

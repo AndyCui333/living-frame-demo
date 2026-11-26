@@ -7,6 +7,7 @@ import com.livingframe.ai.dto.ChatRequest;
 import com.livingframe.ai.dto.ChatResponse;
 import com.livingframe.ai.model.AiResolvedConfig;
 import com.livingframe.ai.model.MemoryHit;
+import com.livingframe.ai.tool.SystemTools;
 import com.livingframe.common.api.ResultCode;
 import com.livingframe.common.context.LoginUserContext;
 import com.livingframe.common.exception.BusinessException;
@@ -34,6 +35,7 @@ public class AiChatService {
     private final AiConversationService conversationService;
     private final AiQdrantMemoryService memoryService;
     private final AiMemoryProperties memoryProperties;
+    private final SystemTools systemTools;
 
     public ChatResponse chat(ChatRequest request) {
         Long userId = LoginUserContext.require().getId();
@@ -53,6 +55,7 @@ public class AiChatService {
             ChatClient chatClient = chatClientFactory.create(config, SYSTEM_PROMPT);
             String reply = chatClient.prompt()
                     .user(prompt)
+                    .tools(systemTools)
                     .call()
                     .content();
             if (StrUtil.isBlank(reply)) {

@@ -7,9 +7,12 @@ import {
   Briefcase,
   ChatDotRound,
   DataBoard,
+  Headset,
   Key,
   MagicStick,
   Refresh,
+  Tickets,
+  Trophy,
   User,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -39,8 +42,23 @@ const roleNames: Record<string, string> = {
   SYSTEM_ADMIN: '系统管理员',
   BUSINESS_ADMIN: '业务管理员',
   VIEWER: '只读用户',
+  CS_CHAT: '在线客服',
+  CS_TECH: '技术客服',
   BIZ_USER: '业务用户',
 }
+
+const ADMIN_ROLES = ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'BUSINESS_ADMIN']
+const isAdminRole = computed(() => (auth.user?.roles ?? []).some((role) => ADMIN_ROLES.includes(role)))
+const isCustomerService = computed(() =>
+  (auth.user?.roles ?? []).some((role) => role === 'CS_CHAT' || role === 'CS_TECH'),
+)
+const workbenchEyebrow = computed(() => (isCustomerService.value ? 'CUSTOMER SERVICE' : 'MY WORKSPACE'))
+const workbenchTitle = computed(() => (isCustomerService.value ? '客服工作台' : '我的工作台'))
+const workbenchDescription = computed(() =>
+  isCustomerService.value
+    ? '处理待接入工单、回复门户用户，并查看客服排行。'
+    : '这里只展示与你当前角色相关的快捷入口和工作信息。',
+)
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -79,6 +97,15 @@ const quickLinks = computed(() => {
   }
   if (auth.hasPermission('ai:agent')) {
     links.push({ title: 'AI Agent', desc: '让模型调用系统工具', path: '/ai/agent', icon: MagicStick, color: '#f59e0b' })
+  }
+  if (auth.hasPermission('cs:chat:list')) {
+    links.push({ title: '客服聊天', desc: '处理门户用户实时会话', path: '/customer-service/chat', icon: Headset, color: '#0ea5e9' })
+  }
+  if (auth.hasPermission('cs:ticket:list')) {
+    links.push({ title: '工单流程', desc: '查看、转接和归档工单', path: '/customer-service/ticket', icon: Tickets, color: '#6366f1' })
+  }
+  if (auth.hasPermission('cs:ranking:list')) {
+    links.push({ title: '客服排行', desc: '查看客服处理量和评分', path: '/customer-service/ranking', icon: Trophy, color: '#d49a16' })
   }
   if (auth.hasPermission('system:permission:list')) {
     links.push({ title: '权限管理', desc: '维护菜单与按钮权限', path: '/system/permission', icon: Key, color: '#ef4444' })
@@ -173,8 +200,9 @@ onMounted(loadData)
       </div>
     </section>
 
-    <div class="section-label">管理端数据</div>
-    <section class="stat-grid" v-loading="loading">
+    <template v-if="isAdminRole">
+      <div class="section-label">管理端数据</div>
+      <section class="stat-grid" v-loading="loading">
       <div class="stat-card">
         <div class="stat-icon icon-blue"><el-icon><User /></el-icon></div>
         <div class="stat-body">
@@ -245,7 +273,34 @@ onMounted(loadData)
           </div>
         </div>
       </section>
+      </template>
     </template>
+
+    <section v-else class="role-workbench">
+      <div class="role-workbench-copy">
+        <span class="role-workbench-eyebrow">{{ workbenchEyebrow }}</span>
+        <h2>{{ workbenchTitle }}</h2>
+        <p>{{ workbenchDescription }}</p>
+        <div class="role-workbench-tags">
+          <el-tag v-for="role in roleTags" :key="role" effect="plain" round>{{ role }}</el-tag>
+        </div>
+      </div>
+      <div class="role-workbench-actions">
+        <el-button v-if="auth.hasPermission('cs:chat:list')" type="primary" @click="router.push('/customer-service/chat')">
+          进入客服聊天
+          <el-icon class="ml-1"><ArrowRight /></el-icon>
+        </el-button>
+        <el-button v-if="auth.hasPermission('cs:ticket:list')" @click="router.push('/customer-service/ticket')">
+          查看工单流程
+        </el-button>
+        <el-button v-if="auth.hasPermission('cs:ranking:list')" @click="router.push('/customer-service/ranking')">
+          查看客服排行
+        </el-button>
+        <el-button v-if="auth.hasPermission('ai:chat')" @click="router.push('/ai/chat')">
+          打开 AI 助手
+        </el-button>
+      </div>
+    </section>
 
     <section class="bottom-grid">
       <div class="panel">
@@ -520,6 +575,58 @@ onMounted(loadData)
   font-size: 11px;
 }
 
+.role-workbench {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 30px;
+  border: 1px solid #e7ecf5;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(79, 107, 251, 0.12), transparent 34%),
+    linear-gradient(135deg, #f8faff, #ffffff);
+  box-shadow: 0 10px 28px rgba(31, 41, 55, 0.05);
+}
+
+.role-workbench-eyebrow {
+  color: #4f6bfb;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+}
+
+.role-workbench-copy h2 {
+  margin: 7px 0 0;
+  color: #172033;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+
+.role-workbench-copy p {
+  margin: 7px 0 0;
+  color: #7d889b;
+  font-size: 13px;
+}
+
+.role-workbench-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.role-workbench-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.role-workbench-actions :deep(.el-button) {
+  margin-left: 0;
+}
+
 .bottom-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
@@ -667,6 +774,15 @@ onMounted(loadData)
   .stat-grid,
   .quick-grid {
     grid-template-columns: 1fr;
+  }
+
+  .role-workbench {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .role-workbench-actions {
+    justify-content: flex-start;
   }
 }
 </style>

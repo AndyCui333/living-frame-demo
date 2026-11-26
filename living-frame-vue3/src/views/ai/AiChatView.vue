@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type InputInstance } from 'element-plus'
 import { ChatDotRound, Clock, CopyDocument, Delete, MagicStick, Plus, Promotion, Setting, User } from '@element-plus/icons-vue'
 import { chat, deleteConversation, getAiStatus, getConversationDetail, getConversations } from '@/api/ai'
 import type { AiConversation, AiStatus } from '@/types/api'
@@ -25,6 +25,7 @@ const historyLoading = ref(false)
 const historyVisible = ref(false)
 const conversationId = ref<string>()
 const messagesEl = ref<HTMLElement>()
+const inputRef = ref<InputInstance>()
 let localMessageId = 0
 
 const suggestions = [
@@ -154,8 +155,10 @@ function formatServerTime(value: string): string {
   }).format(date)
 }
 
-function useSuggestion(text: string) {
+async function useSuggestion(text: string) {
   input.value = text
+  await nextTick()
+  inputRef.value?.focus()
 }
 
 async function copyMessage(content: string) {
@@ -264,7 +267,21 @@ onMounted(async () => {
       </div>
 
       <div class="chat-input-wrap">
+        <div class="composer-suggestions">
+          <span class="composer-suggestions-label">常用问题</span>
+          <button
+            v-for="item in suggestions"
+            :key="item"
+            type="button"
+            class="composer-suggestion"
+            :disabled="loading || status?.enabled === false"
+            @click="useSuggestion(item)"
+          >
+            {{ item }}
+          </button>
+        </div>
         <el-input
+          ref="inputRef"
           v-model="input"
           type="textarea"
           :rows="3"
@@ -618,6 +635,53 @@ onMounted(async () => {
   padding: 14px 18px 16px;
   border-top: 1px solid var(--lf-border);
   background: #ffffff;
+}
+
+.composer-suggestions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.composer-suggestions::-webkit-scrollbar {
+  display: none;
+}
+
+.composer-suggestions-label {
+  flex: 0 0 auto;
+  color: #9aa3b5;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.composer-suggestion {
+  flex: 0 0 auto;
+  max-width: 240px;
+  padding: 5px 10px;
+  overflow: hidden;
+  border: 1px solid #e8ebf3;
+  border-radius: 999px;
+  color: #677084;
+  background: #f8f9fc;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.composer-suggestion:hover:not(:disabled) {
+  border-color: #ced7fe;
+  color: #3d55e8;
+  background: #f2f5ff;
+}
+
+.composer-suggestion:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .chat-input-wrap :deep(.el-textarea__inner) {

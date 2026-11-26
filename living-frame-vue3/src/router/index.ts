@@ -21,7 +21,7 @@ const router = createRouter({
           path: 'dashboard',
           name: 'Dashboard',
           component: () => import('@/views/dashboard/DashboardView.vue'),
-          meta: { title: '首页' },
+          meta: { title: '首页', permission: 'dashboard' },
         },
         {
           path: 'system',
@@ -186,6 +186,12 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
+    if (to.name === 'Dashboard') {
+      const fallback = auth.firstMenuPath
+      if (fallback && fallback !== to.fullPath) {
+        return { path: fallback }
+      }
+    }
     return { path: '/403' }
   }
 
