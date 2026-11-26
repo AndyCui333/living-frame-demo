@@ -4,6 +4,8 @@ target/
 *.ipr
 *.iws
 .mvn/*
+build/
+*.ipa
 !.mvn/jvm.config
 logs/
 *.log

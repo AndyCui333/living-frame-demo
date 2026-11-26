@@ -101,6 +101,31 @@ CREATE DATABASE IF NOT EXISTS `living_frame`
 
 表结构与演示数据由 `living-frame-admin`、`data.sql` 在启动时自动执行，脚本幂等。
 
+也可以使用项目提供的数据库初始化脚本手工建库：
+
+```powershell
+# Windows
+.\scripts\init-db.ps1 -HostName 127.0.0.1 -Port 3306 -User root -Password '你的密码'
+
+# 预演，只生成合并后的 SQL，不连接数据库
+.\scripts\init-db.ps1 -DryRun
+```
+
+```bash
+# Linux / macOS
+MYSQL_HOST=127.0.0.1 MYSQL_USER=root MYSQL_PASSWORD='你的密码' ./scripts/init-db.sh
+```
+
+脚本会按顺序执行：
+
+```text
+00-create-database.sql
+schema.sql
+data.sql
+```
+
+不会重复创建已有表，演示数据使用 `INSERT IGNORE`，可重复执行。
+
 ### 3.3 构建
 
 ```powershell
