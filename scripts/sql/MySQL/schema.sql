@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS `sys_user`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='后台用户';
 
+INSERT IGNORE INTO `sys_user` (`id`, `username`, `password`, `nickname`, `email`, `phone`, `avatar`, `status`, `deleted`) VALUES (2119649179186569218, 'admin', '$2a$10$FwCC65V6ZMfEDelbb0WLXukRxnjEubjP23Sgbjg73EAbYm1buC73u', '超级管理员', '', '', '', 1, 0);
+
 CREATE TABLE IF NOT EXISTS `sys_role`
 (
     `id`          BIGINT       NOT NULL COMMENT '主键',
@@ -35,6 +37,8 @@ CREATE TABLE IF NOT EXISTS `sys_role`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='角色';
+
+INSERT IGNORE INTO `sys_role` (`id`, `code`, `name`, `description`, `status`, `sort`, `deleted`) VALUES (1, 'SUPER_ADMIN', '超级管理员', '拥有系统全部权限', 1, 1, 0);
 
 CREATE TABLE IF NOT EXISTS `sys_permission`
 (
@@ -302,3 +306,73 @@ CREATE TABLE IF NOT EXISTS `sys_blacklist`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='系统黑名单';
+
+-- ============================================================
+-- 超级管理员初始化数据
+-- ============================================================
+
+-- 超级管理员账号绑定 SUPER_ADMIN 角色
+INSERT IGNORE INTO `sys_user_role` (`user_id`, `role_id`)
+VALUES (2119649179186569218, 1);
+
+-- 菜单权限
+INSERT IGNORE INTO `sys_permission`
+(`id`, `code`, `name`, `type`, `parent_id`, `path`, `sort`, `status`, `deleted`)
+VALUES (99, 'dashboard', '首页', 'MENU', 0, '/dashboard', 0, 1, 0),
+       (100, 'system', '系统管理', 'MENU', 0, '/system', 1, 1, 0),
+       (101, 'system:user:list', '用户管理', 'MENU', 100, '/system/user', 1, 1, 0),
+       (102, 'system:role:list', '角色管理', 'MENU', 100, '/system/role', 2, 1, 0),
+       (103, 'system:permission:list', '权限管理', 'MENU', 100, '/system/permission', 3, 1, 0),
+       (104, 'system:login-log:list', '系统登录日志', 'MENU', 100, '/system/login-log', 4, 1, 0),
+       (105, 'system:operation-log:list', '系统操作日志', 'MENU', 100, '/system/operation-log', 5, 1, 0),
+       (106, 'system:blacklist:list', '系统黑名单', 'MENU', 0, '/system/blacklist', 5, 1, 0),
+       (107, 'system:file:list', '文件管理', 'MENU', 100, '/system/file', 7, 1, 0),
+       (110, 'business', '业务管理', 'MENU', 0, '/business', 2, 1, 0),
+       (111, 'business:user:list', '业务用户', 'MENU', 110, '/business/user', 1, 1, 0),
+       (112, 'business:login-log:portal', '门户登录日志', 'MENU', 110, '/business/login-log', 2, 1, 0),
+       (113, 'business:operation-log:portal', '门户操作日志', 'MENU', 110, '/business/operation-log', 3, 1, 0),
+       (114, 'business:statistics:list', '用户统计', 'MENU', 110, '/business/statistics', 4, 1, 0),
+       (120, 'ai', 'AI 能力', 'MENU', 0, '/ai', 3, 1, 0),
+       (121, 'ai:chat', 'AI 对话', 'MENU', 120, '/ai/chat', 1, 1, 0),
+       (122, 'ai:agent', 'AI Agent', 'MENU', 120, '/ai/agent', 2, 1, 0),
+       (123, 'ai:config', 'AI 设置', 'MENU', 120, '/ai/settings', 3, 1, 0),
+       (130, 'customer-service', '客服中心', 'MENU', 0, '/customer-service', 4, 1, 0),
+       (131, 'cs:chat:list', '客服聊天', 'MENU', 130, '/customer-service/chat', 1, 1, 0),
+       (132, 'cs:ticket:list', '工单流程', 'MENU', 130, '/customer-service/ticket', 2, 1, 0),
+       (140, 'cs:ranking:list', '客服排行', 'MENU', 0, '/customer-service/ranking', 6, 1, 0);
+
+-- 按钮权限
+INSERT IGNORE INTO `sys_permission`
+(`id`, `code`, `name`, `type`, `parent_id`, `path`, `sort`, `status`, `deleted`)
+VALUES (200, 'system:user:create', '新增用户', 'BUTTON', 101, NULL, 1, 1, 0),
+       (201, 'system:user:update', '编辑用户', 'BUTTON', 101, NULL, 2, 1, 0),
+       (202, 'system:user:delete', '删除用户', 'BUTTON', 101, NULL, 3, 1, 0),
+       (203, 'system:user:reset-password', '重置密码', 'BUTTON', 101, NULL, 4, 1, 0),
+       (204, 'system:user:assign-role', '分配角色', 'BUTTON', 101, NULL, 5, 1, 0),
+       (210, 'system:role:create', '新增角色', 'BUTTON', 102, NULL, 1, 1, 0),
+       (211, 'system:role:update', '编辑角色', 'BUTTON', 102, NULL, 2, 1, 0),
+       (212, 'system:role:delete', '删除角色', 'BUTTON', 102, NULL, 3, 1, 0),
+       (213, 'system:role:assign-permission', '分配权限', 'BUTTON', 102, NULL, 4, 1, 0),
+       (220, 'system:permission:create', '新增权限', 'BUTTON', 103, NULL, 1, 1, 0),
+       (221, 'system:permission:update', '编辑权限', 'BUTTON', 103, NULL, 2, 1, 0),
+       (222, 'system:permission:delete', '删除权限', 'BUTTON', 103, NULL, 3, 1, 0),
+       (230, 'business:user:create', '新增业务用户', 'BUTTON', 111, NULL, 1, 1, 0),
+       (231, 'business:user:update', '编辑业务用户', 'BUTTON', 111, NULL, 2, 1, 0),
+       (232, 'business:user:delete', '删除业务用户', 'BUTTON', 111, NULL, 3, 1, 0),
+       (240, 'system:blacklist:create', '新增黑名单', 'BUTTON', 106, NULL, 1, 1, 0),
+       (241, 'system:blacklist:update', '编辑黑名单', 'BUTTON', 106, NULL, 2, 1, 0),
+       (242, 'system:blacklist:delete', '删除黑名单', 'BUTTON', 106, NULL, 3, 1, 0),
+       (250, 'system:file:upload', '上传文件', 'BUTTON', 107, NULL, 1, 1, 0),
+       (251, 'system:file:delete', '删除文件', 'BUTTON', 107, NULL, 2, 1, 0),
+       (252, 'system:file:bucket', '管理 Bucket', 'BUTTON', 107, NULL, 3, 1, 0),
+       (260, 'cs:chat:reply', '回复客服消息', 'BUTTON', 131, NULL, 1, 1, 0),
+       (261, 'cs:ticket:dispatch', '派遣工单', 'BUTTON', 132, NULL, 1, 1, 0),
+       (262, 'cs:ticket:transfer', '转接工单', 'BUTTON', 132, NULL, 2, 1, 0),
+       (263, 'cs:ticket:close', '截单归档', 'BUTTON', 132, NULL, 3, 1, 0);
+
+-- SUPER_ADMIN 代码内直接放行全部权限；这里仍写全角色权限关联，
+-- 方便以后去掉代码级 superAdmin 放行时仍保持完整权限。
+INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
+SELECT 1, id
+FROM `sys_permission`
+WHERE `deleted` = 0;

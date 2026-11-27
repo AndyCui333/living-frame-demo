@@ -90,41 +90,48 @@ npm run dev
 
 ### 3.2 建库（可选）
 
-JDBC URL 带了 `createDatabaseIfNotExist=true`，首次启动会自动建库。也可以手工执行：
+数据库初始化脚本：
+
+```text
+scripts/sql/MySQL/schema.sql
+```
+
+先创建数据库：
 
 ```sql
--- living-frame-admin/src/main/resources/db/00-create-database.sql
 CREATE DATABASE IF NOT EXISTS `living_frame`
     DEFAULT CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 ```
 
-表结构与演示数据由 `living-frame-admin`、`data.sql` 在启动时自动执行，脚本幂等。
-
-也可以使用项目提供的数据库初始化脚本手工建库：
+再执行表结构和初始化数据：
 
 ```powershell
-# Windows
-.\scripts\init-db.ps1 -HostName 127.0.0.1 -Port 3306 -User root -Password '你的密码'
+mysql --default-character-set=utf8mb4 -h 127.0.0.1 -P 3306 -u root -p `
+  -e "CREATE DATABASE IF NOT EXISTS living_frame DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-# 预演，只生成合并后的 SQL，不连接数据库
-.\scripts\init-db.ps1 -DryRun
+cmd /c "mysql --default-character-set=utf8mb4 -h 127.0.0.1 -P 3306 -u root -p living_frame < scripts\sql\MySQL\schema.sql"
 ```
+
+也可以直接使用 MySQL 客户端：
 
 ```bash
-# Linux / macOS
-MYSQL_HOST=127.0.0.1 MYSQL_USER=root MYSQL_PASSWORD='你的密码' ./scripts/init-db.sh
+mysql --default-character-set=utf8mb4 -h 127.0.0.1 -P 3306 -u root -p \
+  -e "CREATE DATABASE IF NOT EXISTS living_frame DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+mysql --default-character-set=utf8mb4 -h 127.0.0.1 -P 3306 -u root -p living_frame \
+  < scripts/sql/MySQL/schema.sql
 ```
 
-脚本会按顺序执行：
+`schema.sql` 包含：
 
-```text
-00-create-database.sql
-schema.sql
-data.sql
-```
+- 表结构
+- `admin / Admin@123` 超级管理员账号
+- `SUPER_ADMIN` 角色及账号绑定
+- 菜单和按钮权限
+- 超级管理员角色权限关联
 
-不会重复创建已有表，演示数据使用 `INSERT IGNORE`，可重复执行。
+脚本使用 `CREATE TABLE IF NOT EXISTS` 和 `INSERT IGNORE`，可重复执行。其他演示账号由 `AccountInitializer` 在应用启动时按配置补齐，不会覆盖已有账号。
 
 ### 3.3 构建
 
@@ -557,3 +564,53 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1
 - **MySQL 连接失败**：确认 `192.168.28.212:3306` 可达、root 密码正确；MySQL 9.x 使用 `caching_sha2_password`，URL 已带 `allowPublicKeyRetrieval=true`。
 - **Redis 连接失败**：确认密码 `Cjx991121!` 和 6854 端口；Redisson 与 Spring Data Redis 使用同一实例。
 - **8080 被占用**：启动参数加 `--server.port=8081`。
+
+## 13. GitHub 同步
+
+统一使用公开仓库的 `maven-version` 分支，不再新建功能分支：
+
+```text
+https://github.com/AndyCui333/living-frame-demo
+分支：maven-version
+```
+
+首次拉取：
+
+```powershell
+git clone https://github.com/AndyCui333/living-frame-demo.git
+cd living-frame-demo
+git checkout maven-version
+```
+
+提交本地修改：
+
+```powershell
+git status
+git add <需要提交的文件>
+git commit -m "描述本次修改"
+git push origin maven-version
+```
+
+同步前检查：
+
+```powershell
+git status --short
+git diff --stat
+```
+
+同步约定：
+
+- 所有代码统一提交到 `maven-version`
+- 不创建新的功能分支或临时分支
+- 不提交 `target/`、`node_modules/`、`dist/`、`.tmp/`、`build/`、`*.log`、`*.ipa`
+- 不提交 `.env`、`application-dev.yml` 等本地配置和密钥文件
+- 提交前至少完成对应模块的构建验证：
+  - 后端：`mvn package -Dmaven.test.skip=true`
+  - 管理端：`npm run build`
+  - 门户端：`npm run build`
+
+如果 GitHub HTTPS 推送出现 TLS 连接中断，可重试：
+
+```powershell
+git -c http.version=HTTP/1.1 push origin maven-version
+```
